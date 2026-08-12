@@ -117,6 +117,32 @@ try {
   assert(mobileDimensions.document <= mobileDimensions.viewport);
   await mobilePage.screenshot({ path: path.join(output, "mobile.png"), fullPage: true });
 
+  const overlayPage = await browser.newPage({ viewport: { width: 300, height: 600 }, deviceScaleFactor: 1 });
+  overlayPage.on("pageerror", (error) => errors.push(error.message));
+  overlayPage.on("response", (response) => {
+    if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`);
+  });
+  await overlayPage.goto("http://localhost:3000/overlay?demo=1", { waitUntil: "domcontentloaded" });
+  await overlayPage.getByText("Choose an augment", { exact: true }).waitFor();
+  await overlayPage.locator(".overlay-offers article").first().waitFor();
+  assert.equal(await overlayPage.locator(".overlay-offers article").count(), 3);
+  await overlayPage.locator(".overlay-verdict").waitFor();
+  assert(await overlayPage.getByText("Craze Factor", { exact: true }).count() > 0);
+  await overlayPage.waitForFunction(() => [...document.images].every((image) => image.complete), null, { timeout: 10_000 });
+  const overlayImageStates = await overlayPage.locator("img").evaluateAll((images) => images.map((image) => ({
+    alt: image.alt,
+    loaded: image.naturalWidth > 0,
+    source: image.getAttribute("src") ?? "",
+  })));
+  const overlayDimensions = await overlayPage.evaluate(() => ({
+    viewport: window.innerWidth,
+    document: document.documentElement.scrollWidth,
+    component: Math.round(document.querySelector(".overlay-page")?.getBoundingClientRect().width ?? 0),
+  }));
+  assert(overlayDimensions.document <= overlayDimensions.viewport);
+  assert(overlayDimensions.component <= 300);
+  await overlayPage.screenshot({ path: path.join(output, "live-overlay-demo.png"), fullPage: true });
+
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({
     desktopCombos,
@@ -128,6 +154,10 @@ try {
     statLabSteps: 2,
     personalRunApi: deleteResponse.status(),
     mobileDimensions,
+    overlayDimensions,
+    overlayOffers: 3,
+    overlayImagesLoaded: overlayImageStates.filter((image) => image.loaded).length,
+    overlayImagesTotal: overlayImageStates.length,
     consoleErrors: errors.length,
   }, null, 2));
 } finally {

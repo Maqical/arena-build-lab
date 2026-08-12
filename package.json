@@ -1,6 +1,6 @@
 {
   "name": "arena-build-lab",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "engines": {
     "node": ">=24.0.0"
@@ -17,6 +17,7 @@
     "extremes:export": "tsx scripts/export-extreme-builds.ts",
     "extremes": "npm run extremes:build && npm run extremes:export",
     "find-extreme": "tsx scripts/find_extreme_builds.ts",
+    "meta:sync": "tsx scripts/sync_meta.ts",
     "data:sync": "tsx scripts/sync-data.ts",
     "youtube:sync": ".venv\\Scripts\\python.exe workers/youtube_catalog.py --details-limit 20 --transcripts",
     "youtube:link": ".venv\\Scripts\\python.exe workers/youtube_catalog.py --link-only && npm run videos:combos",
@@ -26,12 +27,14 @@
   "dependencies": {
     "next": "16.3.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "@types/node": "24.10.1",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
+    "@types/ws": "^8.18.1",
     "eslint": "9.39.2",
     "eslint-config-next": "16.3.0",
     "playwright-core": "^1.61.0",

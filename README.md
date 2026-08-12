@@ -17,6 +17,8 @@ Open <http://localhost:3000>.
 
 The live draft picker is at <http://localhost:3000/ai-picker>. Manual three-option comparisons always run locally. To enable screenshot reading and the optional two-sentence AI recommendation, copy `.env.example` to `.env.local`, set `OPENAI_API_KEY`, and optionally change `OPENAI_PICKER_MODEL`.
 
+The live companion is at <http://localhost:3000/overlay>. Open it as a 300x600 browser window on a second monitor. It discovers the running League Client lockfile, follows Arena lobby/champion-select/in-game transitions over the local LCU event stream, and reads current champion stats and items from Riot's local Live Client Data API. The overlay sends detected state into the existing resolver and AI picker; no process injection, memory reading, or automated game input is used. Add `?demo=1` to preview a complete augment-selection state without running League.
+
 `data:sync` refreshes patch-aware champion, augment, and Arena item data. `youtube:sync` incrementally catalogs King Nidhogg uploads and retrieves captions for the newest detailed videos. Both commands are safe to rerun.
 
 ## What is included
@@ -28,6 +30,7 @@ The live draft picker is at <http://localhost:3000/ai-picker>. Manual three-opti
 - A local My Runs journal for champion, placement, items, augments, notes, and per-choice personal performance. These rates describe only the user's own saved matches and are never presented as global statistics.
 - A pure fixed-point resolver for recursive stat graphs plus an offline extreme-build search covering 1 Prismatic, 2 Gold, and 1 Silver augment slots.
 - A live three-offer draft picker with local stat deltas, current item/augment context, optional screenshot extraction, and a structured OpenAI recommendation with a deterministic no-key fallback.
+- A compact live companion overlay with automatic League lockfile discovery, reconnect backoff, Arena phase detection, SSE updates, current-game stats, and resolver-powered Craze Factor.
 - Searchable video titles, descriptions, captions, exact entity mentions, champion links, and timestamped evidence.
 - A crash-safe incremental YouTube worker. Network requests run concurrently, while SQLite writes remain serialized.
 - Responsive local UI plus JSON endpoints at `/api/catalog`, `/api/combos`, `/api/videos`, and `/api/personal-runs`.
@@ -39,6 +42,9 @@ The live draft picker is at <http://localhost:3000/ai-picker>. Manual three-opti
 # Refresh current Riot/CommunityDragon data and rebuild all mechanic paths
 npm run data:sync
 
+# Refresh champion win/pick/tier and augment pick/tier labels used by the overlay
+npm run meta:sync
+
 # Enrich 20 more incomplete uploads with descriptions and English captions
 npm run youtube:sync
 
@@ -48,6 +54,12 @@ npm run youtube:link
 # Deep channel pass (safe to interrupt and rerun)
 .venv\Scripts\python.exe workers\youtube_catalog.py --details-limit 1000 --transcripts --workers 4
 ```
+
+## Live client boundary
+
+`/api/lcu/status` is a server-sent event stream; `/api/lcu/status?once=1` returns one diagnostic snapshot. Lockfile credentials never leave the backend response boundary. Auto-detection of the exact three offered augments is conservative: the monitor accepts only an explicitly named three-option augment payload from a local client event and will never guess from unrelated choices. Riot's currently published LCU and Live Client schemas do not document the Arena offer payload, so the overlay reports `Offer feed unavailable` when the running client does not emit it. Manual/screenshot picking remains available in that case. Selected items and live combat stats continue to update automatically.
+
+The LCU surface is locally available but unsupported for third-party applications. Before distributing a public companion, register the product through Riot's developer portal and revalidate the local endpoints after League patches. If lockfile discovery cannot locate a custom install, set `LEAGUE_LOCKFILE_PATH` in `.env.local`.
 
 Age-restricted videos are skipped unless a local browser cookie source is supplied with `--cookies-from-browser chrome` (or another yt-dlp-supported browser). No cookies are stored in the Arena database.
 

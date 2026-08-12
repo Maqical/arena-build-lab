@@ -174,4 +174,19 @@ CREATE TABLE IF NOT EXISTS extreme_builds (
 
 CREATE INDEX IF NOT EXISTS extreme_builds_lookup_idx
 ON extreme_builds(objective, champion_key, scenario_name, result_rank);
+
+CREATE TABLE IF NOT EXISTS arena_meta (
+  entity_key TEXT PRIMARY KEY,
+  kind TEXT NOT NULL CHECK (kind IN ('champion', 'augment')),
+  tier TEXT NOT NULL DEFAULT '',
+  win_rate REAL,
+  pick_rate REAL,
+  patch TEXT NOT NULL,
+  source_name TEXT NOT NULL,
+  source_url TEXT NOT NULL,
+  fetched_at TEXT NOT NULL,
+  extra_json TEXT NOT NULL DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS arena_meta_kind_idx ON arena_meta(kind, tier, pick_rate DESC);
 `;

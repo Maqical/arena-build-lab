@@ -315,6 +315,67 @@ footer { color: #5f5868; font-size: 10px; text-align: center; margin-top: 42px; 
 .delta-grid em { color: #716879; font-style: normal; }
 .delta-grid .changed em { color: #6ee5a7; }
 
+/* 300x600 companion window. Keep this section self-contained so the main lab
+   remains comfortable at desktop widths. */
+.overlay-page { width: min(300px, 100vw); min-height: 100vh; margin: 0 auto; padding: 7px; background: #09070e; }
+.overlay-topline { display: flex; align-items: center; justify-content: space-between; padding: 3px 3px 8px; color: #766d81; font-size: 8px; letter-spacing: .04em; text-transform: uppercase; }
+.overlay-topline a { color: var(--violet-bright); text-decoration: none; font-weight: 700; }
+.live-overlay { display: flex; flex-direction: column; gap: 7px; }
+.live-overlay > section, .overlay-status { border: 1px solid var(--line); border-radius: 8px; background: linear-gradient(145deg, rgba(25,20,36,.97), rgba(14,11,21,.98)); }
+.overlay-status { display: flex; align-items: center; justify-content: space-between; min-height: 44px; padding: 7px 9px; }
+.overlay-status > div { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.overlay-status > div > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.overlay-status strong { font-size: 10px; }
+.overlay-status small { overflow: hidden; color: #81798d; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.overlay-status > b { color: #6ee5a7; font: 8px var(--font-geist-mono), monospace; letter-spacing: .08em; }
+.overlay-dot { width: 7px; height: 7px; border-radius: 50%; background: #f4c96b; box-shadow: 0 0 8px rgba(244,201,107,.45); }
+.overlay-dot.live { background: #6ee5a7; box-shadow: 0 0 8px rgba(110,229,167,.55); }
+.overlay-dot.retrying { background: var(--danger); box-shadow: 0 0 8px rgba(255,100,124,.5); }
+.overlay-champion { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px; }
+.overlay-champion img, .overlay-champion-placeholder { border-radius: 7px; border: 1px solid rgba(196,173,255,.22); }
+.overlay-champion-placeholder { display: grid; width: 42px; height: 42px; place-items: center; color: #716879; }
+.overlay-champion > div { min-width: 0; }
+.overlay-champion span { color: #81798d; font-size: 8px; text-transform: uppercase; }
+.overlay-champion h1 { overflow: hidden; margin: 2px 0 0; font: 500 18px/1 Georgia, serif; text-overflow: ellipsis; white-space: nowrap; }
+.overlay-champion > a { display: flex; flex-direction: column; align-items: flex-end; color: inherit; text-decoration: none; }
+.overlay-champion > a strong { color: #6ee5a7; font: 12px var(--font-geist-mono), monospace; }
+.overlay-champion > a span { max-width: 80px; text-align: right; }
+.overlay-offers, .overlay-hud { padding: 8px; }
+.overlay-section-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; color: #8b8398; font-size: 8px; letter-spacing: .06em; text-transform: uppercase; }
+.overlay-section-title b { color: var(--violet-bright); font-size: 8px; }
+.overlay-offers article { display: grid; grid-template-columns: 34px minmax(0, 1fr) 76px; gap: 7px; align-items: center; min-height: 48px; padding: 6px; border-top: 1px solid rgba(255,255,255,.055); }
+.overlay-offers article.best { margin: 2px -2px; border: 1px solid rgba(110,229,167,.3); border-radius: 7px; background: rgba(110,229,167,.055); }
+.overlay-offers article img { border-radius: 6px; }
+.overlay-offers article > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.overlay-offers article span { overflow: hidden; color: #847b90; font-size: 7px; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+.overlay-offers article strong { overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.overlay-offers dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; margin: 0; }
+.overlay-offers dl div { display: flex; flex-direction: column; align-items: flex-end; }
+.overlay-offers dt { color: #716879; font-size: 6px; }
+.overlay-offers dd { margin: 0; color: #6ee5a7; font: 7px var(--font-geist-mono), monospace; }
+.overlay-verdict { margin-top: 6px; padding: 7px; border-radius: 6px; background: rgba(157,120,255,.09); }
+.overlay-verdict span { color: var(--violet-bright); font-size: 7px; text-transform: uppercase; }
+.overlay-verdict strong { display: block; margin-top: 2px; color: #fff; font-size: 10px; }
+.overlay-verdict p, .overlay-offer-wait p { margin: 3px 0 0; color: #9b93a8; font-size: 8px; line-height: 1.35; }
+.overlay-offer-wait { padding: 10px; }
+.overlay-offer-wait span { color: var(--gold); font-size: 9px; font-weight: 650; }
+.overlay-stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.overlay-stat-grid > div { display: flex; min-width: 0; flex-direction: column; gap: 2px; padding: 6px 4px; border-radius: 5px; background: rgba(255,255,255,.025); }
+.overlay-stat-grid span { color: #7c7488; font-size: 7px; text-transform: uppercase; }
+.overlay-stat-grid strong { overflow: hidden; font: 11px var(--font-geist-mono), monospace; text-overflow: ellipsis; }
+.overlay-stat-grid small { color: #6ee5a7; font-size: 6px; }
+.craze-meter { margin-top: 7px; padding-top: 6px; border-top: 1px solid rgba(255,255,255,.055); }
+.craze-meter > div:first-child { display: flex; align-items: baseline; justify-content: space-between; color: #90879c; font-size: 8px; text-transform: uppercase; }
+.craze-meter strong { color: var(--gold); font: 13px var(--font-geist-mono), monospace; }
+.craze-track { height: 4px; margin: 4px 0; overflow: hidden; border-radius: 99px; background: rgba(255,255,255,.06); }
+.craze-track i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #6ee5a7, #f4c96b, #ff647c); }
+.craze-meter small { color: #716879; font-size: 7px; }
+.overlay-owned { display: flex; gap: 4px; padding: 3px 1px; overflow: hidden; }
+.overlay-owned img { border: 1px solid rgba(255,255,255,.09); border-radius: 4px; }
+.overlay-error { margin: 0; padding: 7px; border: 1px solid rgba(255,100,124,.25); border-radius: 6px; color: #ff9bac; font-size: 8px; }
+.live-overlay footer { display: flex; justify-content: space-between; margin: 0; padding: 5px 2px; border: 0; color: #5f5868; font-size: 7px; text-align: left; }
+.live-overlay footer a { color: #8d8199; text-decoration: none; }
+
 @media (max-width: 1100px) {
   .lab-panel { grid-template-columns: 1fr 2fr; }
   .goal-field { grid-column: 1 / -1; }

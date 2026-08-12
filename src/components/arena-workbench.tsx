@@ -230,6 +230,7 @@ export function ArenaWorkbench({
             </button>
           ))}
           <Link href="/ai-picker"><span>✦</span>AI draft picker</Link>
+          <Link href="/overlay"><span>◉</span>Live overlay</Link>
         </nav>
         <div className="sidebar-status">
           <span className="pulse" />
