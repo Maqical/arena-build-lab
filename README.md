@@ -23,6 +23,16 @@ The mathematical build table is at <http://localhost:3000/extreme-builds>. It lo
 
 `data:sync` refreshes patch-aware champion, augment, and Arena item data. `youtube:sync` incrementally catalogs King Nidhogg uploads and retrieves captions for the newest detailed videos. Both commands are safe to rerun.
 
+To ingest your own Arena history from Riot Match-v5, copy `.env.example` to `.env.local`, set `RIOT_API_KEY`, and run:
+
+```powershell
+npm run riot:sync -- --player="Your Riot ID#NA1" --count=20
+```
+
+The command resolves the Riot ID, requests current queue `1740` and historical queue `1700`, stores raw matches and participants immutably, and checkpoints each cohort member. Re-running it does not duplicate matches. For an explicitly labeled KR Ranked Solo Challenger proxy cohort, use `npm run riot:sync -- --platform=kr --region=asia --cohort=kr-challenger-proxy --seed-challenger=10`. This is a seed population, not an Arena rank. Existing cohorts can also be extended with repeated `--puuid=...` arguments. API keys stay server-side and `.env.local` is ignored by Git.
+
+The checked-in parser fixture is schema-faithful and contains no real player data. After the first successful sync, `--capture-fixture=tests/fixtures/riot_match_real.local.json` can save one redacted real response for local verification; `*.local.json` fixtures are ignored by Git.
+
 ## What is included
 
 - Current champion, Arena augment, and map-30 item records in `data/arena.sqlite`.
@@ -30,9 +40,11 @@ The mathematical build table is at <http://localhost:3000/extreme-builds>. It lo
 - Champion, build-goal, and text filters; every catalog card can jump directly into matching build paths.
 - An executable Stat Lab that chains current structured coefficients for high-value conversions such as mana → health → AD and AP → haste → movement → attack speed. Every result includes its arithmetic trace.
 - A local My Runs journal for champion, placement, items, augments, notes, and per-choice personal performance. These rates describe only the user's own saved matches and are never presented as global statistics.
+- An immutable Riot Match-v5 warehouse with source region/platform, raw response hashes, participant augment/item snapshots, resumable cohort checkpoints, and rate-limit-aware ingestion.
 - A pure fixed-point resolver for recursive stat graphs plus an offline extreme-build search covering 1 Prismatic, 2 Gold, and 1 Silver augment slots.
 - A live three-offer draft picker with local stat deltas, current item/augment context, optional screenshot extraction, and a structured OpenAI recommendation with a deterministic no-key fallback.
 - A compact live companion overlay with automatic League lockfile discovery, reconnect backoff, Arena phase detection, SSE updates, current-game stats, and resolver-powered Craze Factor.
+- Local Live Client peak-stat observations persisted at Arena game end, preserving transient maxima such as HP or AD that may not appear in the end-of-game Match-v5 payload.
 - A sortable Extreme Build Browser that exposes the 658k-HP Sion benchmark and every row in `data/extreme_builds.csv`.
 - A Champion Select assistant with automatic hover/lock detection, extreme targets, augment/item anchors, and clearly labeled role-plus-meta duo candidates.
 - A clipboard-image picker in the overlay: take a snip with `Win+Shift+S`, focus the overlay, then press `Ctrl+Shift+A`, paste normally, or click **Paste augment snip**.

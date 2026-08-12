@@ -189,4 +189,150 @@ CREATE TABLE IF NOT EXISTS arena_meta (
 );
 
 CREATE INDEX IF NOT EXISTS arena_meta_kind_idx ON arena_meta(kind, tier, pick_rate DESC);
+
+-- Immutable Riot API warehouse. Raw match rows are never rewritten by a meta
+-- calculation; derived observations point back to their source population.
+CREATE TABLE IF NOT EXISTS riot_matches (
+  match_id TEXT PRIMARY KEY,
+  routing_region TEXT NOT NULL,
+  platform TEXT NOT NULL,
+  queue_id INTEGER NOT NULL,
+  game_mode TEXT NOT NULL,
+  map_id INTEGER,
+  patch TEXT NOT NULL,
+  game_version TEXT NOT NULL,
+  started_at TEXT NOT NULL,
+  duration_seconds INTEGER NOT NULL,
+  participant_count INTEGER NOT NULL,
+  raw_json TEXT NOT NULL,
+  raw_json_hash TEXT NOT NULL,
+  ingested_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS riot_matches_region_started_idx
+ON riot_matches(routing_region, started_at DESC);
+CREATE INDEX IF NOT EXISTS riot_matches_patch_queue_idx
+ON riot_matches(patch, queue_id, game_mode);
+
+CREATE TABLE IF NOT EXISTS riot_participants (
+  match_id TEXT NOT NULL REFERENCES riot_matches(match_id) ON DELETE CASCADE,
+  participant_index INTEGER NOT NULL,
+  puuid TEXT NOT NULL DEFAULT '',
+  puuid_hash TEXT NOT NULL DEFAULT '',
+  champion_id INTEGER NOT NULL,
+  champion_name TEXT NOT NULL DEFAULT '',
+  placement INTEGER,
+  subteam_id INTEGER,
+  won INTEGER NOT NULL DEFAULT 0 CHECK (won IN (0, 1)),
+  augments_json TEXT NOT NULL DEFAULT '[]',
+  items_json TEXT NOT NULL DEFAULT '[]',
+  final_stats_json TEXT NOT NULL DEFAULT '{}',
+  raw_json TEXT NOT NULL DEFAULT '{}',
+  ingested_at TEXT NOT NULL,
+  PRIMARY KEY(match_id, participant_index)
+);
+
+CREATE INDEX IF NOT EXISTS riot_participants_puuid_idx
+ON riot_participants(puuid, match_id);
+CREATE INDEX IF NOT EXISTS riot_participants_champion_idx
+ON riot_participants(champion_id, placement);
+
+CREATE TABLE IF NOT EXISTS cohort_members (
+  cohort_id TEXT NOT NULL,
+  puuid TEXT NOT NULL,
+  platform TEXT NOT NULL,
+  routing_region TEXT NOT NULL,
+  game_name TEXT NOT NULL DEFAULT '',
+  tag_line TEXT NOT NULL DEFAULT '',
+  seed_method TEXT NOT NULL,
+  active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+  last_match_start_ms INTEGER,
+  last_checked_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY(cohort_id, puuid)
+);
+
+CREATE INDEX IF NOT EXISTS cohort_members_active_idx
+ON cohort_members(cohort_id, active, platform);
+
+CREATE TABLE IF NOT EXISTS meta_snapshots (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  source TEXT NOT NULL,
+  source_url TEXT NOT NULL DEFAULT '',
+  region TEXT NOT NULL,
+  platform TEXT NOT NULL DEFAULT '',
+  patch TEXT NOT NULL,
+  cohort_id TEXT NOT NULL DEFAULT '',
+  metric TEXT NOT NULL,
+  metric_definition TEXT NOT NULL,
+  entity_key TEXT,
+  kind TEXT CHECK (kind IS NULL OR kind IN ('champion', 'augment', 'item', 'augment_combo')),
+  champion_id INTEGER,
+  augment_set_json TEXT NOT NULL DEFAULT '[]',
+  numerator REAL,
+  denominator REAL,
+  value REAL,
+  average_placement REAL,
+  sample_size INTEGER NOT NULL DEFAULT 0,
+  generated_at TEXT NOT NULL,
+  details_json TEXT NOT NULL DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS meta_snapshots_lookup_idx
+ON meta_snapshots(source, region, patch, metric, champion_id, generated_at DESC);
+CREATE INDEX IF NOT EXISTS meta_snapshots_entity_idx
+ON meta_snapshots(entity_key, metric, generated_at DESC);
+
+CREATE TABLE IF NOT EXISTS live_observations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  puuid TEXT NOT NULL DEFAULT '',
+  champion_id INTEGER,
+  champion_name TEXT NOT NULL DEFAULT '',
+  augment_ids_json TEXT NOT NULL DEFAULT '[]',
+  observed_max_hp REAL NOT NULL DEFAULT 0,
+  observed_max_ad REAL NOT NULL DEFAULT 0,
+  observed_max_ap REAL NOT NULL DEFAULT 0,
+  observed_max_as REAL NOT NULL DEFAULT 0,
+  observed_max_armor REAL NOT NULL DEFAULT 0,
+  observed_max_mr REAL NOT NULL DEFAULT 0,
+  observed_max_ms REAL NOT NULL DEFAULT 0,
+  observed_max_haste REAL NOT NULL DEFAULT 0,
+  queue_id INTEGER,
+  started_at TEXT NOT NULL,
+  ended_at TEXT NOT NULL,
+  source TEXT NOT NULL DEFAULT 'live_client',
+  extra_json TEXT NOT NULL DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS live_observations_champion_idx
+ON live_observations(champion_id, observed_max_hp DESC);
+
+-- Future UI consumers can opt into this view without changing or replacing the
+-- current arena_meta table. Each derived source keeps its own provenance row.
+CREATE VIEW IF NOT EXISTS arena_meta_all_sources AS
+SELECT entity_key, kind, tier, win_rate, pick_rate, patch, source_name,
+  source_url, fetched_at, extra_json
+FROM arena_meta
+UNION ALL
+SELECT
+  entity_key,
+  COALESCE(kind, 'augment') AS kind,
+  '' AS tier,
+  MAX(CASE WHEN metric IN ('win_rate', 'first_place_rate', 'top_half_rate', 'top3_rate') THEN value END) AS win_rate,
+  MAX(CASE WHEN metric = 'pick_rate' THEN value END) AS pick_rate,
+  patch,
+  source AS source_name,
+  MAX(source_url) AS source_url,
+  MAX(generated_at) AS fetched_at,
+  json_object(
+    'region', region,
+    'platform', platform,
+    'cohortId', cohort_id,
+    'sampleSize', MAX(sample_size),
+    'metricDefinition', MAX(metric_definition)
+  ) AS extra_json
+FROM meta_snapshots
+WHERE entity_key IS NOT NULL AND kind IN ('champion', 'augment')
+GROUP BY entity_key, kind, patch, source, region, platform, cohort_id;
 `;

@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import https from "node:https";
 import { ClientConnector, type LcuConnectorStatus, type LcuJsonApiEvent } from "@/lib/lcu/ClientConnector";
+import { mergeObservedMaxima, type LiveObservationInput } from "@/lib/live-observations";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -236,6 +237,7 @@ export class GameStateMonitor extends EventEmitter {
   private sequence = 0;
   private offers: { refs: string[]; sourceUri: string; detectedAt: string; expiresAt: number } | null = null;
   private observedCandidateUris = new Set<string>();
+  private liveObservation: LiveObservationInput | null = null;
   private snapshotValue: GameStateSnapshot = {
     sequence: 0,
     connection: EMPTY_CONNECTION,
@@ -252,7 +254,10 @@ export class GameStateMonitor extends EventEmitter {
     updatedAt: new Date().toISOString(),
   };
 
-  constructor(connector = new ClientConnector()) {
+  constructor(
+    connector = new ClientConnector(),
+    private readonly observationSink?: (observation: LiveObservationInput) => Promise<void> | void,
+  ) {
     super();
     this.connector = connector;
     connector.on("status", () => void this.refresh());
@@ -316,6 +321,27 @@ export class GameStateMonitor extends EventEmitter {
       const phase = normalizedPhase(rawPhase, isArena, offeredAugmentRefs, Boolean(live));
       const championId = livePlayer.name ? null : championFromSelect(champSelect);
       const offerStatus = offeredAugmentRefs.length === 3 ? "detected" : isArena && phase === "in_progress" ? "not_exposed" : "waiting";
+      if (isArena && livePlayer.stats) {
+        const previous = this.liveObservation;
+        this.liveObservation = {
+          championId: previous?.championId ?? this.snapshotValue.champion.id,
+          championName: livePlayer.name || previous?.championName || this.snapshotValue.champion.name,
+          augmentIds: unique([
+            ...(previous?.augmentIds ?? []),
+            ...currentEntityRefs.filter((reference) => /^augment:/i.test(reference)),
+          ]),
+          maxima: mergeObservedMaxima(previous?.maxima ?? null, livePlayer.stats),
+          queueId: arena.queueId ?? previous?.queueId ?? this.snapshotValue.queueId,
+          startedAt: previous?.startedAt ?? new Date().toISOString(),
+          endedAt: new Date().toISOString(),
+          source: "live_client",
+          extra: { gameMode: gameMode || "CHERRY" },
+        };
+      }
+      const completedObservation = this.liveObservation && this.snapshotValue.phase === "in_progress" && phase !== "in_progress"
+        ? { ...this.liveObservation, endedAt: new Date().toISOString() }
+        : null;
+      if (completedObservation) this.liveObservation = null;
       this.sequence += 1;
       this.snapshotValue = {
         sequence: this.sequence,
@@ -343,6 +369,14 @@ export class GameStateMonitor extends EventEmitter {
         updatedAt: new Date().toISOString(),
       };
       this.emit("change", this.snapshot());
+      if (completedObservation) {
+        this.emit("live-observation", structuredClone(completedObservation));
+        if (this.observationSink) {
+          void Promise.resolve()
+            .then(() => this.observationSink?.(completedObservation))
+            .catch((error) => this.emit("observation-error", error));
+        }
+      }
     } finally {
       this.refreshing = false;
     }
@@ -352,7 +386,15 @@ export class GameStateMonitor extends EventEmitter {
 const globalMonitor = globalThis as typeof globalThis & { arenaGameStateMonitor?: GameStateMonitor };
 
 export function getGameStateMonitor(): GameStateMonitor {
-  if (!globalMonitor.arenaGameStateMonitor) globalMonitor.arenaGameStateMonitor = new GameStateMonitor();
+  if (!globalMonitor.arenaGameStateMonitor) {
+    globalMonitor.arenaGameStateMonitor = new GameStateMonitor(new ClientConnector(), async (observation) => {
+      const [{ getDatabase }, { insertLiveObservation }] = await Promise.all([
+        import("@/lib/db"),
+        import("@/lib/live-observations"),
+      ]);
+      insertLiveObservation(getDatabase(), observation);
+    });
+  }
   globalMonitor.arenaGameStateMonitor.start();
   return globalMonitor.arenaGameStateMonitor;
 }

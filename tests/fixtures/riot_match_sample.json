@@ -1,0 +1,71 @@
+{
+  "metadata": {
+    "dataVersion": "2",
+    "matchId": "KR_1234567890",
+    "participants": [
+      "sample-puuid-one",
+      "sample-puuid-two"
+    ]
+  },
+  "info": {
+    "gameCreation": 1786579200000,
+    "gameStartTimestamp": 1786579260000,
+    "gameDuration": 1875,
+    "gameEndTimestamp": 1786581135000,
+    "gameId": 1234567890,
+    "gameMode": "CHERRY",
+    "gameName": "teambuilder-match-1234567890",
+    "gameType": "MATCHED_GAME",
+    "gameVersion": "16.15.700.1234",
+    "mapId": 30,
+    "queueId": 1740,
+    "participants": [
+      {
+        "participantId": 1,
+        "puuid": "sample-puuid-one",
+        "championId": 14,
+        "championName": "Sion",
+        "placement": 1,
+        "playerSubteamId": 1,
+        "win": true,
+        "playerAugment1": 137000,
+        "playerAugment2": 137101,
+        "playerAugment3": 137202,
+        "playerAugment4": 137303,
+        "item0": 3083,
+        "item1": 3748,
+        "item2": 4401,
+        "item3": 0,
+        "item4": 0,
+        "item5": 0,
+        "item6": 3340,
+        "champLevel": 18,
+        "kills": 8,
+        "deaths": 3,
+        "assists": 14,
+        "goldEarned": 24500,
+        "totalDamageDealtToChampions": 83210,
+        "totalDamageTaken": 142300,
+        "damageSelfMitigated": 311000,
+        "largestCriticalStrike": 1260
+      },
+      {
+        "participantId": 2,
+        "puuid": "sample-puuid-two",
+        "championId": 67,
+        "championName": "Vayne",
+        "subteamPlacement": 2,
+        "subteamId": 2,
+        "win": false,
+        "augments": [137404, 137505, 0],
+        "item0": 3124,
+        "item1": 3091,
+        "item2": 0,
+        "champLevel": 17,
+        "kills": 5,
+        "deaths": 5,
+        "assists": 7
+      }
+    ]
+  }
+}
