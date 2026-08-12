@@ -143,6 +143,61 @@ try {
   assert(overlayDimensions.component <= 300);
   await overlayPage.screenshot({ path: path.join(output, "live-overlay-demo.png"), fullPage: true });
 
+  const extremePage = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
+  extremePage.on("pageerror", (error) => errors.push(error.message));
+  await extremePage.goto("http://localhost:3000/extreme-builds", { waitUntil: "networkidle" });
+  await extremePage.getByRole("heading", { name: "Extreme Build Browser", exact: true }).waitFor();
+  await extremePage.getByLabel("Champion filter").selectOption({ label: "Sion" });
+  await extremePage.getByText("658,207", { exact: true }).first().waitFor();
+  const sionExtremeRows = await extremePage.locator(".extreme-row:not(.extreme-table-head)").count();
+  assert(sionExtremeRows >= 20);
+  await extremePage.getByRole("button", { name: "Copy build", exact: true }).first().click();
+  await extremePage.getByRole("button", { name: "Copied", exact: true }).waitFor();
+  await extremePage.screenshot({ path: path.join(output, "extreme-builds.png"), fullPage: true });
+
+  const championSelectPage = await browser.newPage({ viewport: { width: 1180, height: 900 }, deviceScaleFactor: 1 });
+  championSelectPage.on("pageerror", (error) => errors.push(error.message));
+  await championSelectPage.goto("http://localhost:3000/champ-select", { waitUntil: "domcontentloaded" });
+  await championSelectPage.getByLabel("Preview champion").selectOption({ label: "Sion" });
+  await championSelectPage.locator(".champ-extreme").getByText(/658,207 HP/).waitFor();
+  assert(await championSelectPage.locator(".champ-duos article").count() >= 3);
+  assert(await championSelectPage.locator(".champ-picks article").count() >= 4);
+  await championSelectPage.screenshot({ path: path.join(output, "champ-select-assistant.png"), fullPage: true });
+
+  const champOverlayPage = await browser.newPage({ viewport: { width: 300, height: 600 }, deviceScaleFactor: 1 });
+  champOverlayPage.on("pageerror", (error) => errors.push(error.message));
+  await champOverlayPage.goto("http://localhost:3000/overlay?demo=champ-select", { waitUntil: "domcontentloaded" });
+  await champOverlayPage.getByText("Live Arena hover / lock", { exact: true }).waitFor();
+  await champOverlayPage.locator(".champ-extreme").getByText(/658,207 HP/).waitFor();
+  assert.equal(await champOverlayPage.getByRole("button", { name: /Paste augment snip/ }).count(), 1);
+  await champOverlayPage.screenshot({ path: path.join(output, "champ-select-overlay.png"), fullPage: true });
+
+  const hotkeyPage = await browser.newPage({ viewport: { width: 300, height: 600 }, deviceScaleFactor: 1 });
+  await hotkeyPage.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { read: async () => [{ types: ["image/png"], getType: async () => new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" }) }] } });
+  });
+  await hotkeyPage.route("**/api/ai-picker", async (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      champion: { key: "Sion", name: "Sion" }, level: 18, opponent: "Arena lobby", baseline: {},
+      options: [
+        { entity: { entityKey: "augment:41", name: "Goliath", kind: "augment", rarity: "prismatic", description: "Health and adaptive force.", iconUrl: "", executable: true }, deltas: { maxHealth: 1267, totalAttackDamage: 100.4, abilityPower: 0 }, resolved: {}, localScore: 100 },
+        { entity: { entityKey: "augment:313", name: "Tank Engine", kind: "augment", rarity: "gold", description: "Health per takedown.", iconUrl: "", executable: true }, deltas: { maxHealth: 800, totalAttackDamage: 24, abilityPower: 0 }, resolved: {}, localScore: 80 },
+        { entity: { entityKey: "augment:56", name: "Mind to Matter", kind: "augment", rarity: "silver", description: "Mana to health.", iconUrl: "", executable: true }, deltas: { maxHealth: 500, totalAttackDamage: 15, abilityPower: 0 }, resolved: {}, localScore: 70 },
+      ],
+      recommendation: { entityKey: "augment:41", name: "Goliath", rationale: "Best screenshot-derived health conversion for this benchmark.", confidence: .94 },
+      provider: "openai", model: "ui-test", warning: "", screenshotExtracted: true,
+    }),
+  }));
+  await hotkeyPage.goto("http://localhost:3000/overlay?demo=screenshot", { waitUntil: "domcontentloaded" });
+  await hotkeyPage.getByRole("button", { name: /Paste augment snip/ }).waitFor();
+  await hotkeyPage.locator(".overlay-champion").getByText("Sion", { exact: true }).waitFor();
+  await hotkeyPage.keyboard.press("Control+Shift+A");
+  await hotkeyPage.getByText("Screenshot offers", { exact: true }).waitFor();
+  await hotkeyPage.getByText("Best screenshot-derived health conversion", { exact: false }).waitFor();
+  await hotkeyPage.screenshot({ path: path.join(output, "screenshot-hotkey-overlay.png"), fullPage: true });
+
   assert.deepEqual(errors, []);
   console.log(JSON.stringify({
     desktopCombos,
@@ -158,6 +213,11 @@ try {
     overlayOffers: 3,
     overlayImagesLoaded: overlayImageStates.filter((image) => image.loaded).length,
     overlayImagesTotal: overlayImageStates.length,
+    sionExtremeRows,
+    championSelectDuos: await championSelectPage.locator(".champ-duos article").count(),
+    championSelectAugments: await championSelectPage.locator(".champ-picks article").count(),
+    screenshotShortcutControls: 1,
+    screenshotHotkeyResult: "Goliath",
     consoleErrors: errors.length,
   }, null, 2));
 } finally {

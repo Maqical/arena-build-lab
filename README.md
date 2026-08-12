@@ -17,7 +17,9 @@ Open <http://localhost:3000>.
 
 The live draft picker is at <http://localhost:3000/ai-picker>. Manual three-option comparisons always run locally. To enable screenshot reading and the optional two-sentence AI recommendation, copy `.env.example` to `.env.local`, set `OPENAI_API_KEY`, and optionally change `OPENAI_PICKER_MODEL`.
 
-The live companion is at <http://localhost:3000/overlay>. Open it as a 300x600 browser window on a second monitor. It discovers the running League Client lockfile, follows Arena lobby/champion-select/in-game transitions over the local LCU event stream, and reads current champion stats and items from Riot's local Live Client Data API. The overlay sends detected state into the existing resolver and AI picker; no process injection, memory reading, or automated game input is used. Add `?demo=1` to preview a complete augment-selection state without running League.
+The live companion is at <http://localhost:3000/overlay>. Open it as a 300x600 browser window on a second monitor. It discovers the running League Client lockfile, follows Arena lobby/champion-select/in-game transitions over the local LCU event stream, and reads current champion stats and items from Riot's local Live Client Data API. The overlay sends detected state into the existing resolver and AI picker; no process injection, memory reading, or automated game input is used. Add `?demo=1` to preview augment selection or `?demo=champ-select` to preview Champion Select without running League.
+
+The mathematical build table is at <http://localhost:3000/extreme-builds>. It loads `data/extreme_builds.csv` on the server and provides champion/objective/search filters, HP/AD/AP/AS sorting, scenario-aware stats, and copyable build plans. The live Champion Select dashboard is at <http://localhost:3000/champ-select>; it follows the same LCU stream and combines the hovered champion with local extreme builds, curated conversion paths, and synced meta labels.
 
 `data:sync` refreshes patch-aware champion, augment, and Arena item data. `youtube:sync` incrementally catalogs King Nidhogg uploads and retrieves captions for the newest detailed videos. Both commands are safe to rerun.
 
@@ -31,6 +33,9 @@ The live companion is at <http://localhost:3000/overlay>. Open it as a 300x600 b
 - A pure fixed-point resolver for recursive stat graphs plus an offline extreme-build search covering 1 Prismatic, 2 Gold, and 1 Silver augment slots.
 - A live three-offer draft picker with local stat deltas, current item/augment context, optional screenshot extraction, and a structured OpenAI recommendation with a deterministic no-key fallback.
 - A compact live companion overlay with automatic League lockfile discovery, reconnect backoff, Arena phase detection, SSE updates, current-game stats, and resolver-powered Craze Factor.
+- A sortable Extreme Build Browser that exposes the 658k-HP Sion benchmark and every row in `data/extreme_builds.csv`.
+- A Champion Select assistant with automatic hover/lock detection, extreme targets, augment/item anchors, and clearly labeled role-plus-meta duo candidates.
+- A clipboard-image picker in the overlay: take a snip with `Win+Shift+S`, focus the overlay, then press `Ctrl+Shift+A`, paste normally, or click **Paste augment snip**.
 - Searchable video titles, descriptions, captions, exact entity mentions, champion links, and timestamped evidence.
 - A crash-safe incremental YouTube worker. Network requests run concurrently, while SQLite writes remain serialized.
 - Responsive local UI plus JSON endpoints at `/api/catalog`, `/api/combos`, `/api/videos`, and `/api/personal-runs`.
@@ -60,6 +65,10 @@ npm run youtube:link
 `/api/lcu/status` is a server-sent event stream; `/api/lcu/status?once=1` returns one diagnostic snapshot. Lockfile credentials never leave the backend response boundary. Auto-detection of the exact three offered augments is conservative: the monitor accepts only an explicitly named three-option augment payload from a local client event and will never guess from unrelated choices. Riot's currently published LCU and Live Client schemas do not document the Arena offer payload, so the overlay reports `Offer feed unavailable` when the running client does not emit it. Manual/screenshot picking remains available in that case. Selected items and live combat stats continue to update automatically.
 
 The LCU surface is locally available but unsupported for third-party applications. Before distributing a public companion, register the product through Riot's developer portal and revalidate the local endpoints after League patches. If lockfile discovery cannot locate a custom install, set `LEAGUE_LOCKFILE_PATH` in `.env.local`.
+
+Web pages cannot register an operating-system-global shortcut, force themselves always-on-top, or capture another application silently. `Ctrl+Shift+A` therefore works while the 300x600 overlay window is focused and reads only an image the user explicitly copied to the clipboard. The adjacent **Image** button is the permission-free file fallback. Screenshot contents go to the configured OpenAI vision endpoint only after one of those user actions; live stats and manual choices remain local.
+
+The copied extreme-build text is a readable loadout plan for notes/chat. League currently has no Arena-augment import schema, so the app does not claim those plans are native client item-set imports.
 
 Age-restricted videos are skipped unless a local browser cookie source is supplied with `--cookies-from-browser chrome` (or another yt-dlp-supported browser). No cookies are stored in the Arena database.
 

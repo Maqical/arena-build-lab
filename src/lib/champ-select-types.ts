@@ -1,0 +1,36 @@
+import type { ExtremeBuildCsvRow } from "@/lib/extreme-build-csv-core";
+
+export type ChampSelectEntityRecommendation = {
+  entityKey: string;
+  name: string;
+  kind: "augment" | "item";
+  rarity: string;
+  description: string;
+  iconUrl: string;
+  tier: string;
+  pickRate: number | null;
+  reason: string;
+};
+
+export type DuoRecommendation = {
+  championId: number;
+  championKey: string;
+  name: string;
+  iconUrl: string;
+  tags: string[];
+  tier: string;
+  winRate: number | null;
+  pickRate: number | null;
+  fitTags: string[];
+};
+
+export type ChampSelectRecommendation = {
+  champion: { id: number; key: string; name: string; iconUrl: string; tags: string[] };
+  meta: { tier: string; winRate: number | null; pickRate: number | null; patch: string } | null;
+  duoRecommendations: DuoRecommendation[];
+  recommendedAugments: ChampSelectEntityRecommendation[];
+  recommendedItems: ChampSelectEntityRecommendation[];
+  extremeBuilds: ExtremeBuildCsvRow[];
+  note: string;
+};
+

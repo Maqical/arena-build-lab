@@ -2,6 +2,8 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ChampSelectAssistant } from "@/components/overlay/ChampSelectAssistant";
+import { ScreenshotPickerControl } from "@/components/overlay/ScreenshotPickerControl";
 import type { AIPickerResponse } from "@/lib/ai-picker-types";
 import type { GameStateSnapshot } from "@/lib/lcu/GameStateMonitor";
 import type { ArenaMetaRecord, LiveResolveResponse, OverlayCatalogEntity } from "@/lib/live-overlay-types";
@@ -43,22 +45,26 @@ function phaseLabel(snapshot: GameStateSnapshot | null): string {
   return labels[snapshot.phase];
 }
 
-function demoSnapshot(entities: OverlayCatalogEntity[], champions: Champion[]): GameStateSnapshot {
+function demoSnapshot(entities: OverlayCatalogEntity[], champions: Champion[], phase: "augment_select" | "champ_select" | "in_progress" = "augment_select"): GameStateSnapshot {
   const offered = ["Goliath", "Tank Engine", "Mind to Matter"].map((name) => entities.find((entity) => entity.name === name)?.entityKey ?? "").filter(Boolean);
   const sion = champions.find((champion) => champion.key === "Sion");
   return {
     sequence: 1,
     connection: { state: "connected", connected: true, lockfileSource: "demo", port: 0, attempt: 0, retryInMs: null, lastError: "", updatedAt: new Date().toISOString() },
-    phase: "augment_select",
-    rawPhase: "InProgress",
+    phase,
+    rawPhase: phase === "champ_select" ? "ChampSelect" : "InProgress",
     isArena: true,
     queueId: 1740,
     queueName: "Arena demo",
-    champion: { id: sion?.id ?? 14, name: "Sion", level: 18 },
-    currentEntityRefs: [entities.find((entity) => entity.name === "Overlord's Bloodmail")?.entityKey ?? ""].filter(Boolean),
-    offeredAugmentRefs: offered,
-    liveStats: { currentHealth: 11_400, maxHealth: 16_300, attackDamage: 630, abilityPower: 0, attackSpeed: 0.91, armor: 171, magicResistance: 103, moveSpeed: 345, abilityHaste: 25 },
-    offerFeed: { status: "detected", sourceUri: "demo://augment-offers", detectedAt: new Date().toISOString(), note: "Demo offer event.", observedCandidateUris: [] },
+    champion: { id: sion?.id ?? 14, name: "Sion", level: phase === "champ_select" ? 1 : 18 },
+    currentEntityRefs: phase === "champ_select" ? [] : [entities.find((entity) => entity.name === "Overlord's Bloodmail")?.entityKey ?? ""].filter(Boolean),
+    offeredAugmentRefs: phase === "augment_select" ? offered : [],
+    liveStats: phase === "champ_select" ? null : { currentHealth: 11_400, maxHealth: 16_300, attackDamage: 630, abilityPower: 0, attackSpeed: 0.91, armor: 171, magicResistance: 103, moveSpeed: 345, abilityHaste: 25 },
+    offerFeed: phase === "champ_select"
+      ? { status: "waiting", sourceUri: "", detectedAt: "", note: "Champion Select demo.", observedCandidateUris: [] }
+      : phase === "augment_select"
+        ? { status: "detected", sourceUri: "demo://augment-offers", detectedAt: new Date().toISOString(), note: "Demo offer event.", observedCandidateUris: [] }
+        : { status: "not_exposed", sourceUri: "", detectedAt: "", note: "Screenshot-picker demo.", observedCandidateUris: [] },
     updatedAt: new Date().toISOString(),
   };
 }
@@ -100,11 +106,19 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
     [champions, snapshot?.champion.id, snapshot?.champion.name],
   );
   const championMeta = champion ? metaLookup.get(`champion:${champion.key}`) : undefined;
+  const displayedOffers = useMemo(() => {
+    if (offered.length > 0) return offered;
+    if (!recommendation?.screenshotExtracted) return [];
+    return recommendation.options
+      .map((option) => entityLookup.get(normalized(option.entity.entityKey)))
+      .filter((entity): entity is OverlayCatalogEntity => entity?.kind === "augment");
+  }, [entityLookup, offered, recommendation]);
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("demo") === "1") {
+    const demo = new URLSearchParams(window.location.search).get("demo");
+    if (demo === "1" || demo === "champ-select" || demo === "screenshot") {
       const timer = window.setTimeout(() => {
-        setSnapshot(demoSnapshot(entities, champions));
+        setSnapshot(demoSnapshot(entities, champions, demo === "champ-select" ? "champ_select" : demo === "screenshot" ? "in_progress" : "augment_select"));
         setConnectionState("live");
       }, 0);
       return () => window.clearTimeout(timer);
@@ -165,10 +179,10 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
         {championMeta && <a href={championMeta.sourceUrl} target="_blank" rel="noreferrer"><strong>{championMeta.winRate?.toFixed(1)}%</strong><span>Meta WR · {championMeta.tier}</span></a>}
       </section>
 
-      {snapshot?.phase === "augment_select" || offered.length > 0 ? (
+      {snapshot?.phase === "champ_select" ? <ChampSelectAssistant champions={champions} snapshot={snapshot} compact /> : snapshot?.phase === "augment_select" || displayedOffers.length > 0 ? (
         <section className="overlay-offers">
-          <div className="overlay-section-title"><span>Auto-detected offers</span><b>{recommendation ? "Ranked" : "Analyzing…"}</b></div>
-          {offered.map((entity, index) => {
+          <div className="overlay-section-title"><span>{recommendation?.screenshotExtracted && offered.length === 0 ? "Screenshot offers" : "Auto-detected offers"}</span><b>{recommendation ? "Ranked" : "Analyzing…"}</b></div>
+          {displayedOffers.map((entity, index) => {
             const result = recommendation?.options.find((option) => option.entity.entityKey === entity.entityKey);
             const augmentMeta = metaLookup.get(entity.entityKey);
             const recommended = recommendation?.recommendation.entityKey === entity.entityKey;
@@ -186,6 +200,13 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
           <p>{snapshot?.offerFeed.note ?? "The overlay will populate when three offered IDs appear in a local client event."}</p>
         </section>
       )}
+
+      <ScreenshotPickerControl
+        championId={champion?.id ?? snapshot?.champion.id}
+        level={snapshot?.champion.level ?? 18}
+        currentEntityKeys={currentEntities.map((entity) => entity.entityKey)}
+        onResult={(result) => { setRecommendation(result); setError(""); }}
+      />
 
       <section className="overlay-hud">
         <div className="overlay-section-title"><span>Live stat tracker</span><b>{live ? "Live + theory" : "Theoretical"}</b></div>

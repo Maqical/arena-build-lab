@@ -231,6 +231,8 @@ export function ArenaWorkbench({
           ))}
           <Link href="/ai-picker"><span>✦</span>AI draft picker</Link>
           <Link href="/overlay"><span>◉</span>Live overlay</Link>
+          <Link href="/champ-select"><span>◈</span>Champion select</Link>
+          <Link href="/extreme-builds"><span>∞</span>Extreme builds</Link>
         </nav>
         <div className="sidebar-status">
           <span className="pulse" />
