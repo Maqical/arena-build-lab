@@ -5,8 +5,10 @@ out/
 data/*.sqlite
 data/*.sqlite-*
 data/extreme-builds-*.csv
+data/extreme_builds.csv
 data/cache/
 *.log
+*.tsbuildinfo
 .env*
 !.env.example
 qa/*.png

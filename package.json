@@ -1,6 +1,6 @@
 {
   "name": "arena-build-lab",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "engines": {
     "node": ">=24.0.0"
@@ -16,6 +16,7 @@
     "extremes:build": "tsx scripts/generate-extreme-builds.ts",
     "extremes:export": "tsx scripts/export-extreme-builds.ts",
     "extremes": "npm run extremes:build && npm run extremes:export",
+    "find-extreme": "tsx scripts/find_extreme_builds.ts",
     "data:sync": "tsx scripts/sync-data.ts",
     "youtube:sync": ".venv\\Scripts\\python.exe workers/youtube_catalog.py --details-limit 20 --transcripts",
     "youtube:link": ".venv\\Scripts\\python.exe workers/youtube_catalog.py --link-only && npm run videos:combos",

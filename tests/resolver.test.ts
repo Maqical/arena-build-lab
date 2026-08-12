@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { resolveArenaStats, type ResolverChampion, type ResolverEffect } from "../src/engine/resolver";
+import { resolveArenaBuild, resolveArenaStats, type ResolverChampion, type ResolverEffect } from "../src/engine/resolver";
 import { generateAugmentCombinations } from "../src/engine/extreme-finder";
 
 const champion: ResolverChampion = {
@@ -15,6 +15,10 @@ const champion: ResolverChampion = {
     attackDamagePerLevel: 5,
     attackSpeed: 0.7,
     attackSpeedPerLevel: 2,
+    armor: 30,
+    armorPerLevel: 4,
+    magicResistance: 32,
+    magicResistancePerLevel: 2,
     moveSpeed: 350,
   },
 };
@@ -29,7 +33,26 @@ test("builds level-scaled champion base stats", () => {
   assert.equal(result.stats.maxHealth, 2700);
   assert.equal(result.stats.maxMana, 1350);
   assert.equal(result.stats.totalAttackDamage, 185);
+  assert.equal(result.stats.armor, 98);
+  assert.equal(result.stats.magicResistance, 66);
   assert(Math.abs(result.stats.attackSpeed - 0.938) < 1e-9);
+});
+
+test("reports ability haste and its diminishing effective cooldown reduction", () => {
+  const result = resolveArenaStats(champion, 1, [effect("Haste", { flat: { abilityHaste: 100 } })]);
+  assert.equal(result.stats.abilityHaste, 100);
+  assert.equal(result.stats.effectiveCooldownReductionPercent, 50);
+});
+
+test("resolves champion and augment IDs through a caller-provided pure catalog", () => {
+  const haste = effect("Haste", { key: "augment:haste", flat: { abilityHaste: 25 } });
+  const result = resolveArenaBuild({
+    championId: "Test",
+    level: 1,
+    augmentIds: ["augment:haste"],
+    catalog: { champions: [champion], effects: [haste] },
+  });
+  assert.equal(result.stats.abilityHaste, 25);
 });
 
 test("solves a contracting recursive HP to AD to AP to HP graph", () => {
@@ -78,6 +101,25 @@ test("models finite Sion Soul Furnace stacks and identifies unlimited inputs", (
   const unlimited = resolveArenaStats(sion, 1, [], { scenario: { sionSoulFurnace: { smallUnits: Number.POSITIVE_INFINITY } } });
   assert.equal(unlimited.status, "unbounded");
   assert.equal(unlimited.stats.maxHealth, Number.POSITIVE_INFINITY);
+});
+
+test("reproduces the finite 500k+ HP Sion benchmark without hiding unlimited scaling", () => {
+  const sion: ResolverChampion = {
+    id: 14,
+    key: "Sion",
+    name: "Sion",
+    stats: { health: 655, healthPerLevel: 87, mana: 400, manaPerLevel: 52, attackDamage: 68, attackDamagePerLevel: 0, attackSpeed: 0.679, attackSpeedPerLevel: 1.3, armor: 36, armorPerLevel: 4.2, magicResistance: 32, magicResistancePerLevel: 2.05, moveSpeed: 345 },
+  };
+  const effects = [
+    effect("Goliath", { rarity: "prismatic", multipliers: [{ stat: "maxHealth", factor: 1.5 }] }),
+    effect("Tank Engine", { rarity: "gold", multipliers: [{ stat: "bonusHealth", factor: 2.2 }] }),
+    effect("Quest: Steel Your Heart", { rarity: "gold", flat: { maxHealth: 96_000 } }),
+    effect("Mind to Matter", { rules: [{ source: "maxMana", target: "maxHealth", coefficient: 0.7 }] }),
+    { ...effect("Overlord's Bloodmail", { flat: { maxHealth: 400, bonusAttackDamage: 40 } }), kind: "item" as const },
+  ];
+  const result = resolveArenaStats(sion, 18, effects, { scenario: { flatStats: { maxHealth: 48_000 }, sionSoulFurnace: { smallUnits: 13_200 } } });
+  assert.equal(result.status, "converged");
+  assert(result.stats.maxHealth > 500_000);
 });
 
 test("generates every 1-prismatic, 2-gold, 1-silver combination", () => {

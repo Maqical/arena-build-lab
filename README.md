@@ -15,6 +15,8 @@ npm run dev
 
 Open <http://localhost:3000>.
 
+The live draft picker is at <http://localhost:3000/ai-picker>. Manual three-option comparisons always run locally. To enable screenshot reading and the optional two-sentence AI recommendation, copy `.env.example` to `.env.local`, set `OPENAI_API_KEY`, and optionally change `OPENAI_PICKER_MODEL`.
+
 `data:sync` refreshes patch-aware champion, augment, and Arena item data. `youtube:sync` incrementally catalogs King Nidhogg uploads and retrieves captions for the newest detailed videos. Both commands are safe to rerun.
 
 ## What is included
@@ -25,6 +27,7 @@ Open <http://localhost:3000>.
 - An executable Stat Lab that chains current structured coefficients for high-value conversions such as mana → health → AD and AP → haste → movement → attack speed. Every result includes its arithmetic trace.
 - A local My Runs journal for champion, placement, items, augments, notes, and per-choice personal performance. These rates describe only the user's own saved matches and are never presented as global statistics.
 - A pure fixed-point resolver for recursive stat graphs plus an offline extreme-build search covering 1 Prismatic, 2 Gold, and 1 Silver augment slots.
+- A live three-offer draft picker with local stat deltas, current item/augment context, optional screenshot extraction, and a structured OpenAI recommendation with a deterministic no-key fallback.
 - Searchable video titles, descriptions, captions, exact entity mentions, champion links, and timestamped evidence.
 - A crash-safe incremental YouTube worker. Network requests run concurrently, while SQLite writes remain serialized.
 - Responsive local UI plus JSON endpoints at `/api/catalog`, `/api/combos`, `/api/videos`, and `/api/personal-runs`.
@@ -61,6 +64,14 @@ Age-restricted videos are skipped unless a local browser cookie source is suppli
 The first Stat Lab formula set is intentionally narrower than the discovery graph. A formula is executable only when its operation and coefficient can be traced to structured current-patch data or explicit item text; regex-discovered relationships remain recommendations until they receive an executable definition and test.
 
 ## Extreme build engine
+
+For the focused Sion, Cho'Gath, Ezreal, and Shyvana sweep requested by the project roadmap, run:
+
+```powershell
+npm run find-extreme
+```
+
+This writes the top 10 builds for each of Max HP, Max AD, Max AP, and Max AS (40 rows total) to `data/extreme_builds.csv`. The current finite benchmark reproduces a 658k-HP Sion while still marking Sion's true uncapped passive ceiling as theoretical/unbounded.
 
 Run the current-patch theoretical benchmark and write its top-100 review CSV:
 

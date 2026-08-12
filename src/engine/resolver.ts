@@ -7,6 +7,9 @@ export type ResolverStatKey =
   | "totalAttackDamage"
   | "abilityPower"
   | "abilityHaste"
+  | "effectiveCooldownReductionPercent"
+  | "armor"
+  | "magicResistance"
   | "moveSpeed"
   | "bonusAttackSpeedPercent"
   | "attackSpeed"
@@ -18,12 +21,13 @@ export type ResolverStatKey =
 
 export type MutableResolverStatKey = Exclude<
   ResolverStatKey,
-  "bonusHealth" | "baseAttackDamage" | "totalAttackDamage" | "attackSpeed" | "uncappedCritChancePercent"
+  "bonusHealth" | "baseAttackDamage" | "totalAttackDamage" | "attackSpeed" | "uncappedCritChancePercent" | "effectiveCooldownReductionPercent"
 >;
 
 export type ResolverStats = Record<ResolverStatKey, number>;
 
 export type ResolverChampion = {
+  id?: number;
   key: string;
   name: string;
   stats: {
@@ -35,6 +39,10 @@ export type ResolverChampion = {
     attackDamagePerLevel: number;
     attackSpeed: number;
     attackSpeedPerLevel: number;
+    armor: number;
+    armorPerLevel: number;
+    magicResistance: number;
+    magicResistancePerLevel: number;
     moveSpeed: number;
   };
 };
@@ -104,12 +112,28 @@ export type ResolverResult = {
   unboundedReasons: string[];
 };
 
+export type ResolverCatalog = {
+  champions: readonly ResolverChampion[];
+  effects: readonly ResolverEffect[];
+};
+
+export type ResolverIdRequest = {
+  championId: number | string;
+  level: number;
+  augmentIds: readonly string[];
+  itemIds?: readonly string[];
+  catalog: ResolverCatalog;
+  options?: ResolveOptions;
+};
+
 const MUTABLE_KEYS: MutableResolverStatKey[] = [
   "maxHealth",
   "maxMana",
   "bonusAttackDamage",
   "abilityPower",
   "abilityHaste",
+  "armor",
+  "magicResistance",
   "moveSpeed",
   "bonusAttackSpeedPercent",
   "critChancePercent",
@@ -126,6 +150,9 @@ const COMPARED_KEYS: ResolverStatKey[] = [
   "totalAttackDamage",
   "abilityPower",
   "abilityHaste",
+  "effectiveCooldownReductionPercent",
+  "armor",
+  "magicResistance",
   "moveSpeed",
   "bonusAttackSpeedPercent",
   "attackSpeed",
@@ -162,6 +189,7 @@ function derivedStats(
     bonusHealth: Math.max(0, maxHealth - baseHealth),
     baseAttackDamage,
     totalAttackDamage,
+    effectiveCooldownReductionPercent: 100 * Math.max(0, mutable.abilityHaste) / (100 + Math.max(0, mutable.abilityHaste)),
     attackSpeed: Math.min(
       attackSpeedCap,
       Math.max(0, baseAttackSpeed * (1 + mutable.bonusAttackSpeedPercent / 100) * totalAttackSpeedMultiplier),
@@ -220,6 +248,8 @@ export function resolveArenaStats(
     bonusAttackDamage: 0,
     abilityPower: 0,
     abilityHaste: 0,
+    armor: champion.stats.armor + champion.stats.armorPerLevel * (resolvedLevel - 1),
+    magicResistance: champion.stats.magicResistance + champion.stats.magicResistancePerLevel * (resolvedLevel - 1),
     moveSpeed: champion.stats.moveSpeed,
     bonusAttackSpeedPercent: levelAttackSpeed,
     critChancePercent: 0,
@@ -308,4 +338,28 @@ export function resolveArenaStats(
     ? "The conversion graph does not contract toward a finite fixed point."
     : "The conversion graph approached a fixed point but exhausted the iteration budget.");
   return { championKey: champion.key, championName: champion.name, level: resolvedLevel, status, stats: present(current), iterations: maxIterations, delta, attackSpeedCap, effects: effectSummary, warnings, unboundedReasons };
+}
+
+/**
+ * ID-based facade for callers that already hold an in-memory catalog.
+ * Database access stays outside the resolver, so identical inputs always
+ * produce identical output and this function remains safe for tests/workers.
+ */
+export function resolveArenaBuild(request: ResolverIdRequest): ResolverResult {
+  const championId = String(request.championId).toLowerCase();
+  const champion = request.catalog.champions.find((candidate) =>
+    String(candidate.id ?? "").toLowerCase() === championId ||
+    candidate.key.toLowerCase() === championId ||
+    candidate.name.toLowerCase() === championId,
+  );
+  if (!champion) throw new Error(`Unknown champion ID: ${request.championId}`);
+
+  const requestedIds = [...request.augmentIds, ...(request.itemIds ?? [])];
+  const effectsById = new Map(request.catalog.effects.map((effect) => [effect.key.toLowerCase(), effect]));
+  const effects = requestedIds.map((id) => {
+    const effect = effectsById.get(id.toLowerCase());
+    if (!effect) throw new Error(`Unknown Arena effect ID: ${id}`);
+    return effect;
+  });
+  return resolveArenaStats(champion, request.level, effects, request.options);
 }

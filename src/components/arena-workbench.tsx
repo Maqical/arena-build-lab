@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { RunTracker } from "@/components/run-tracker";
 import { StatLab } from "@/components/stat-lab";
@@ -228,6 +229,7 @@ export function ArenaWorkbench({
               <span>{icon}</span>{label}
             </button>
           ))}
+          <Link href="/ai-picker"><span>✦</span>AI draft picker</Link>
         </nav>
         <div className="sidebar-status">
           <span className="pulse" />

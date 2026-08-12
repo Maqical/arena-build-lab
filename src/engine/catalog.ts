@@ -4,6 +4,18 @@ import type { ResolverChampion, ResolverEffect } from "@/engine/resolver";
 type Row = Record<string, unknown>;
 type RawArenaEntity = {
   dataValues?: Record<string, unknown>;
+  stats?: Record<string, unknown>;
+};
+
+export type HydratedResolverEntity = {
+  entityKey: string;
+  name: string;
+  kind: "augment" | "item";
+  rarity: string;
+  description: string;
+  iconUrl: string;
+  effect: ResolverEffect;
+  executable: boolean;
 };
 
 export type ExtremeScenarioInputs = {
@@ -68,7 +80,7 @@ function rankValue(raw: RawArenaEntity, key: string, rank: number, fallback = 0)
   return Number.isFinite(value) ? value : fallback;
 }
 
-function effectFromRow(row: Row, scenario: ExtremeScenarioInputs): ResolverEffect | null {
+export function effectFromRow(row: Row, scenario: ExtremeScenarioInputs): ResolverEffect | null {
   const raw = rawEntity(row);
   const rank = rankCount(raw);
   const base = {
@@ -162,15 +174,59 @@ function effectFromRow(row: Row, scenario: ExtremeScenarioInputs): ResolverEffec
   }
 }
 
+function itemEffectFromRow(row: Row): ResolverEffect {
+  const raw = rawEntity(row);
+  const stats = raw.stats ?? {};
+  const description = String(row.description ?? "");
+  const number = (key: string) => {
+    const value = Number(stats[key] ?? 0);
+    return Number.isFinite(value) ? value : 0;
+  };
+  const haste = Number(description.match(/([\d.]+)\s+Ability Haste/i)?.[1] ?? 0);
+  const flat: NonNullable<ResolverEffect["flat"]> = {
+    maxHealth: number("FlatHPPoolMod"),
+    maxMana: number("FlatMPPoolMod"),
+    bonusAttackDamage: number("FlatPhysicalDamageMod"),
+    abilityPower: number("FlatMagicDamageMod"),
+    abilityHaste: Number.isFinite(haste) ? haste : 0,
+    armor: number("FlatArmorMod"),
+    magicResistance: number("FlatSpellBlockMod"),
+    moveSpeed: number("FlatMovementSpeedMod"),
+    bonusAttackSpeedPercent: number("PercentAttackSpeedMod") * 100,
+    critChancePercent: number("FlatCritChanceMod") * 100,
+  };
+  const effect: ResolverEffect = {
+    key: String(row.entity_key),
+    name: String(row.name),
+    kind: "item",
+    rarity: String(row.rarity),
+    rank: 1,
+    flat,
+  };
+  if (effect.name === "Overlord's Bloodmail") {
+    effect.rules = [{ source: "bonusHealth", target: "bonusAttackDamage", coefficient: 0.03 }];
+    effect.multipliers = [{ stat: "totalAttackDamage", factor: 1.175 }];
+    effect.notes = ["Retribution is evaluated at its stated maximum 17.5% AD increase."];
+  } else if (effect.name === "Rabadon's Deathcap") {
+    effect.multipliers = [{ stat: "abilityPower", factor: 1.3 }];
+  }
+  const moveSpeedMultiplier = number("PercentMovementSpeedMod");
+  if (moveSpeedMultiplier) {
+    effect.multipliers = [...(effect.multipliers ?? []), { stat: "moveSpeed", factor: 1 + moveSpeedMultiplier }];
+  }
+  return effect;
+}
+
 export function loadResolverChampion(db: DatabaseSync, championKeyOrName: string): ResolverChampion | null {
   const row = db.prepare(`
-    SELECT champion_key, name, stats_json FROM champions
-    WHERE lower(champion_key) = lower(?) OR lower(name) = lower(?) LIMIT 1
-  `).get(championKeyOrName, championKeyOrName) as Row | undefined;
+    SELECT id, champion_key, name, stats_json FROM champions
+    WHERE CAST(id AS TEXT) = ? OR lower(champion_key) = lower(?) OR lower(name) = lower(?) LIMIT 1
+  `).get(championKeyOrName, championKeyOrName, championKeyOrName) as Row | undefined;
   if (!row) return null;
   const raw = JSON.parse(String(row.stats_json)) as Record<string, unknown>;
   const number = (key: string) => Number(raw[key] ?? 0);
   return {
+    id: Number(row.id),
     key: String(row.champion_key),
     name: String(row.name),
     stats: {
@@ -182,6 +238,10 @@ export function loadResolverChampion(db: DatabaseSync, championKeyOrName: string
       attackDamagePerLevel: number("attackdamageperlevel"),
       attackSpeed: number("attackspeed"),
       attackSpeedPerLevel: number("attackspeedperlevel"),
+      armor: number("armor"),
+      armorPerLevel: number("armorperlevel"),
+      magicResistance: number("spellblock"),
+      magicResistancePerLevel: number("spellblockperlevel"),
       moveSpeed: number("movespeed"),
     },
   };
@@ -205,20 +265,44 @@ export function loadExtremeAugments(
 
 export function loadExtremeItems(db: DatabaseSync): ResolverEffect[] {
   const row = db.prepare(`
-    SELECT entity_key, name, rarity FROM entities
+    SELECT entity_key, name, rarity, description, raw_json FROM entities
     WHERE kind = 'item' AND lower(name) = lower(?)
     ORDER BY purchasable DESC, numeric_id DESC LIMIT 1
   `).get("Overlord's Bloodmail") as Row | undefined;
   if (!row) return [];
-  return [{
-    key: String(row.entity_key),
+  return [itemEffectFromRow(row)];
+}
+
+export function loadResolverEntity(
+  db: DatabaseSync,
+  entityKey: string,
+  scenario: ExtremeScenarioInputs = DEFAULT_EXTREME_SCENARIO,
+): HydratedResolverEntity | null {
+  const row = db.prepare(`
+    SELECT entity_key, kind, name, rarity, description, icon_url, raw_json
+    FROM entities WHERE entity_key = ? LIMIT 1
+  `).get(entityKey) as Row | undefined;
+  if (!row) return null;
+  const kind = String(row.kind) as HydratedResolverEntity["kind"];
+  const executable = kind === "item" || effectFromRow(row, scenario) !== null;
+  const effect = kind === "item"
+    ? itemEffectFromRow(row)
+    : effectFromRow(row, scenario) ?? {
+      key: String(row.entity_key),
+      name: String(row.name),
+      kind: "augment",
+      rarity: String(row.rarity),
+      rank: 1,
+      notes: ["This conditional augment is described to the AI but does not yet have a universal numeric resolver rule."],
+    };
+  return {
+    entityKey: String(row.entity_key),
     name: String(row.name),
-    kind: "item",
+    kind,
     rarity: String(row.rarity),
-    rank: 1,
-    flat: { maxHealth: 400, bonusAttackDamage: 40 },
-    rules: [{ source: "bonusHealth", target: "bonusAttackDamage", coefficient: 0.03 }],
-    multipliers: [{ stat: "totalAttackDamage", factor: 1.175 }],
-    notes: ["Retribution is evaluated at its stated maximum 17.5% AD increase."],
-  }];
+    description: String(row.description ?? ""),
+    iconUrl: String(row.icon_url ?? ""),
+    effect,
+    executable,
+  };
 }
