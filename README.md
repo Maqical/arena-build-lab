@@ -44,7 +44,7 @@ The checked-in parser fixture is schema-faithful and contains no real player dat
 - A repeatable local meta projection with first-place rate, Top 4 rate, pick rate, region/patch grouping, and a compatibility fallback to the legacy `arena_meta` source.
 - A pure fixed-point resolver for recursive stat graphs plus an offline extreme-build search covering 1 Prismatic, 2 Gold, and 1 Silver augment slots.
 - A live three-offer draft picker with local stat deltas, current item/augment context, optional screenshot extraction, and a structured OpenAI recommendation with a deterministic no-key fallback.
-- A compact live companion overlay with automatic League lockfile discovery, reconnect backoff, Arena phase detection, SSE updates, current-game stats, and resolver-powered Craze Factor.
+- A compact live companion overlay with automatic League lockfile discovery, reconnect backoff, Arena phase detection, SSE updates, current-game stats, resolver-powered Craze Factor, live item paths, and a quick visibility toggle.
 - Local Live Client peak-stat observations persisted at Arena game end, preserving transient maxima such as HP or AD that may not appear in the end-of-game Match-v5 payload.
 - `/history` for personal Riot-ingested games and `/trophies` for the top ten locally recorded HP, AD, and AP peaks.
 - A sortable Extreme Build Browser that exposes the 658k-HP Sion benchmark and every row in `data/extreme_builds.csv`.

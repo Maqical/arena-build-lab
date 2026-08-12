@@ -3,6 +3,8 @@
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChampSelectAssistant } from "@/components/overlay/ChampSelectAssistant";
+import { ItemAssistant } from "@/components/overlay/ItemAssistant";
+import { LiveGameHUD } from "@/components/overlay/LiveGameHUD";
 import { ScreenshotPickerControl } from "@/components/overlay/ScreenshotPickerControl";
 import type { AIPickerResponse } from "@/lib/ai-picker-types";
 import type { GameStateSnapshot } from "@/lib/lcu/GameStateMonitor";
@@ -75,6 +77,7 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
   const [recommendation, setRecommendation] = useState<AIPickerResponse | null>(null);
   const [liveBuild, setLiveBuild] = useState<LiveResolveResponse | null>(null);
   const [error, setError] = useState("");
+  const [visible, setVisible] = useState(true);
   const recommendationSignature = useRef("");
   const resolveSignature = useRef("");
 
@@ -171,8 +174,12 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
     <section className="live-overlay">
       <header className="overlay-status">
         <div><span className={`overlay-dot ${connectionState}`} /><div><strong>{phaseLabel(snapshot)}</strong><small>{snapshot?.isArena ? snapshot.queueName || "Arena detected" : snapshot?.connection.lastError || "Waiting for local client"}</small></div></div>
-        <b>{snapshot?.connection.connected ? "LCU" : "OFF"}</b>
+        <div className="overlay-status-actions"><b>{snapshot?.connection.connected ? "LCU" : "OFF"}</b><button type="button" className="overlay-eye" aria-label={visible ? "Hide overlay details" : "Show overlay details"} onClick={() => setVisible((current) => !current)}>{visible ? "◉" : "◌"}</button></div>
       </header>
+
+      {!visible && <p className="overlay-hidden-note">Overlay details hidden <button type="button" onClick={() => setVisible(true)}>Show</button></p>}
+
+      {visible && <>
 
       <section className="overlay-champion">
         {champion ? <Image src={champion.iconUrl} alt="" width={42} height={42} unoptimized /> : <div className="overlay-champion-placeholder">?</div>}
@@ -180,7 +187,11 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
         {championMeta && <a href={championMeta.sourceUrl} target="_blank" rel="noreferrer"><strong>{championMetaPercent?.toFixed(1)}%</strong><span>{championMeta.sourceName === "riot_api_local" ? `Local WR · ${championMeta.sampleSize ?? 0} games` : `Meta WR · ${championMeta.tier}`}</span></a>}
       </section>
 
-      {snapshot?.phase === "champ_select" ? <ChampSelectAssistant champions={champions} snapshot={snapshot} compact /> : snapshot?.phase === "augment_select" || displayedOffers.length > 0 ? (
+      {snapshot?.phase === "champ_select" ? <ChampSelectAssistant champions={champions} snapshot={snapshot} compact /> : snapshot?.phase === "in_progress" ? <>
+        <LiveGameHUD snapshot={snapshot} build={liveBuild} augments={currentEntities.filter((entity) => entity.kind === "augment")} />
+        <ItemAssistant snapshot={snapshot} />
+        {recommendation?.screenshotExtracted && <section className="overlay-offers"><div className="overlay-section-title"><span>Screenshot offers</span><b>Ranked</b></div><div className="overlay-verdict"><span>AI pick</span><strong>{recommendation.recommendation.name}</strong><p>{recommendation.recommendation.rationale}</p></div></section>}
+      </> : snapshot?.phase === "post_game" ? <section className="overlay-post-game"><div className="overlay-section-title"><span>Match complete</span><b>Recorded locally</b></div><strong>{snapshot.champion.name || "Arena match"}</strong><p>Peak stats and the final observation are available in your Trophy Case.</p><a href="/trophies">Open Trophy Case</a></section> : snapshot?.phase === "augment_select" || displayedOffers.length > 0 ? (
         <section className="overlay-offers">
           <div className="overlay-section-title"><span>{recommendation?.screenshotExtracted && offered.length === 0 ? "Screenshot offers" : "Auto-detected offers"}</span><b>{recommendation ? "Ranked" : "Analyzing…"}</b></div>
           {displayedOffers.map((entity, index) => {
@@ -207,14 +218,14 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
         </section>
       )}
 
-      <ScreenshotPickerControl
+      {visible && snapshot?.phase !== "post_game" && <ScreenshotPickerControl
         championId={champion?.id ?? snapshot?.champion.id}
         level={snapshot?.champion.level ?? 18}
         currentEntityKeys={currentEntities.map((entity) => entity.entityKey)}
         onResult={(result) => { setRecommendation(result); setError(""); }}
-      />
+      />}
 
-      <section className="overlay-hud">
+      {visible && snapshot?.phase !== "in_progress" && snapshot?.phase !== "post_game" && <section className="overlay-hud">
         <div className="overlay-section-title"><span>Live stat tracker</span><b>{live ? "Live + theory" : "Theoretical"}</b></div>
         <div className="overlay-stat-grid">
           <div><span>Max HP</span><strong>{display(theory?.maxHealth)}</strong>{live && <small>game {display(live.maxHealth)}</small>}</div>
@@ -223,10 +234,11 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
           <div><span>AS</span><strong>{display(theory?.attackSpeed, 2)}</strong>{live && <small>game {display(live.attackSpeed, 2)}</small>}</div>
         </div>
         <div className="craze-meter"><div><span>Craze Factor</span><strong>{liveBuild?.crazeFactor ?? 100}</strong></div><div className="craze-track"><i style={{ width: `${Math.min(100, (liveBuild?.crazeFactor ?? 100) / 5)}%` }} /></div><small>{liveBuild?.crazeLabel ?? "Baseline"} · resolver vs. level baseline</small></div>
-      </section>
+      </section>}
 
       {currentEntities.length > 0 && <div className="overlay-owned">{currentEntities.slice(0, 8).map((entity) => <Image title={entity.name} src={entity.iconUrl} width={25} height={25} alt={entity.name} unoptimized key={entity.entityKey} />)}</div>}
-      {error && <p className="overlay-error">{error}</p>}
+      {visible && error && <p className="overlay-error">{error}</p>}
+      </>}
       <footer><span>Local APIs only · no injection</span><a href="/overlay?demo=1">Demo</a></footer>
     </section>
   );

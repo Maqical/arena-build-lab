@@ -351,6 +351,34 @@ footer { color: #5f5868; font-size: 10px; text-align: center; margin-top: 42px; 
 .overlay-offers article strong { overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .overlay-meta-badge { color: #6ee5a7 !important; font: 7px var(--font-geist-mono), monospace !important; text-transform: none !important; }
 .overlay-meta-badge.low { color: var(--gold) !important; }
+.overlay-status-actions { display: flex; align-items: center; gap: 8px; }
+.overlay-eye { border: 1px solid #493d55; background: #171321; color: #c8bdd2; border-radius: 6px; width: 25px; height: 24px; cursor: pointer; }
+.overlay-hidden-note { margin: 12px; padding: 12px; color: #b8aec0; background: #171321; border-radius: 8px; text-align: center; }
+.overlay-hidden-note button { margin-left: 6px; color: #b99be8; border: 0; background: transparent; cursor: pointer; }
+.live-game-hud, .item-assistant, .overlay-post-game { margin: 10px 12px; padding: 10px; border: 1px solid var(--line); border-radius: 9px; background: linear-gradient(145deg, #191424, #100d17); }
+.live-game-identity { display: flex; justify-content: space-between; align-items: baseline; margin: 2px 0 9px; }
+.live-game-identity strong { color: #f4edf8; font-size: 15px; }
+.live-game-identity span, .overlay-muted, .live-game-stats small, .live-craze small { color: #958a9f; font-size: 10px; }
+.live-game-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+.live-game-stats > div { min-width: 0; padding: 6px 4px; background: #100d17; border-radius: 6px; text-align: center; }
+.live-game-stats span { display: block; color: #a79baa; font-size: 9px; text-transform: uppercase; }
+.live-game-stats strong { display: block; color: #f4edf8; font-size: 13px; }
+.live-game-stats small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.live-craze { margin-top: 9px; display: flex; justify-content: space-between; align-items: center; padding-top: 8px; border-top: 1px solid #342a3c; }
+.live-craze span { color: #a79baa; font-size: 10px; display: block; }
+.live-craze strong { color: #f0c46f; font-size: 17px; }
+.live-augment-list { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.live-augment-list > div, .item-buy-list > div { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 5px; background: #100d17; border-radius: 6px; }
+.live-augment-list span, .item-buy-list strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #e4dce9; font-size: 10px; }
+.item-buy-list { display: grid; gap: 5px; }
+.item-buy-list > div { padding: 6px; }
+.item-buy-list span { min-width: 0; flex: 1; }
+.item-buy-list strong, .item-buy-list small { display: block; }
+.item-buy-list small { color: #958a9f; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; }
+.item-buy-list em { color: #80758a; font-size: 8px; font-style: normal; white-space: nowrap; }
+.overlay-post-game strong { color: #f4edf8; font-size: 18px; }
+.overlay-post-game p { color: #a79baa; font-size: 11px; line-height: 1.4; }
+.overlay-post-game a { color: #c3a6f2; font-size: 11px; }
 .overlay-offers dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; margin: 0; }
 .overlay-offers dl div { display: flex; flex-direction: column; align-items: flex-end; }
 .overlay-offers dt { color: #716879; font-size: 6px; }
