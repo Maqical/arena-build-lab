@@ -30,6 +30,31 @@ export function getDatabase(): DatabaseSync {
     if (!videoColumns.some((column) => column.name === "catalog_position")) {
       db.exec("ALTER TABLE videos ADD COLUMN catalog_position INTEGER NOT NULL DEFAULT 0");
     }
+    const runEntityColumns = db.prepare("PRAGMA table_info(personal_run_entities)").all() as Array<{ name: string }>;
+    if (runEntityColumns.length > 0 && !runEntityColumns.some((column) => column.name === "entity_name")) {
+      db.exec("PRAGMA foreign_keys = OFF");
+      db.exec(`
+        BEGIN;
+        ALTER TABLE personal_run_entities RENAME TO personal_run_entities_legacy;
+        CREATE TABLE personal_run_entities (
+          run_id INTEGER NOT NULL REFERENCES personal_runs(id) ON DELETE CASCADE,
+          entity_key TEXT NOT NULL,
+          entity_name TEXT NOT NULL,
+          entity_kind TEXT NOT NULL CHECK (entity_kind IN ('augment', 'item')),
+          icon_url TEXT NOT NULL,
+          rarity TEXT NOT NULL,
+          pick_order INTEGER NOT NULL DEFAULT 0,
+          PRIMARY KEY(run_id, entity_key)
+        );
+        INSERT INTO personal_run_entities(run_id, entity_key, entity_name, entity_kind, icon_url, rarity, pick_order)
+        SELECT pre.run_id, pre.entity_key, e.name, e.kind, e.icon_url, e.rarity, pre.pick_order
+        FROM personal_run_entities_legacy pre JOIN entities e ON e.entity_key = pre.entity_key;
+        DROP TABLE personal_run_entities_legacy;
+        CREATE INDEX personal_run_entities_entity_idx ON personal_run_entities(entity_key);
+        COMMIT;
+      `);
+      db.exec("PRAGMA foreign_keys = ON");
+    }
     globalForDatabase.arenaDatabase = db;
   }
   return globalForDatabase.arenaDatabase;

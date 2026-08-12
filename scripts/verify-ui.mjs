@@ -68,6 +68,37 @@ try {
   }
   await ownedPage.screenshot({ path: path.join(output, "yunara-hamstringer.png"), fullPage: true });
 
+  await page.locator("nav button", { hasText: "Stat Lab" }).click();
+  await page.getByRole("heading", { name: "Stat Conversion Lab", exact: true }).waitFor();
+  await page.getByLabel("Max health").fill("2000");
+  await page.getByLabel("Bonus health").fill("500");
+  await page.getByLabel("Max mana").fill("1000");
+  await page.getByRole("button", { name: /Mind to Matter/ }).click();
+  await page.getByRole("button", { name: /Overlord's Bloodmail/ }).click();
+  assert.match(await page.locator('[data-stat-key="maxHealth"]').innerText(), /2,350/);
+  assert.match(await page.locator('[data-stat-key="bonusAttackDamage"]').innerText(), /25\.5/);
+  assert.equal(await page.locator(".calculation-trace > div").count(), 2);
+  await page.screenshot({ path: path.join(output, "stat-lab.png"), fullPage: true });
+
+  await page.locator("nav button", { hasText: "My runs" }).click();
+  await page.getByRole("heading", { name: "My Arena Runs", exact: true }).waitFor();
+  await page.locator(".run-form select").nth(0).selectOption({ label: "Yunara" });
+  await page.getByText("Teams", { exact: true }).locator("..").getByRole("spinbutton").fill("8");
+  await page.getByText("Placement", { exact: true }).locator("..").getByRole("spinbutton").fill("2");
+  await page.locator(".run-entity-picker select").selectOption({ label: "Hamstringer" });
+  await page.locator(".run-entity-picker select").selectOption({ label: "Vulnerability" });
+  await page.locator(".notes-field textarea").fill("Automated UI verification entry");
+  await page.getByRole("button", { name: "Save run", exact: true }).click();
+  await page.getByText("Run saved locally.", { exact: true }).waitFor();
+  await page.getByText("Yunara · #2 of 8", { exact: true }).waitFor();
+  assert(await page.locator(".performance-name", { hasText: "Hamstringer" }).count() > 0);
+  const runPayload = await page.request.get("http://localhost:3000/api/personal-runs").then((response) => response.json());
+  const verificationRun = runPayload.runs.find((run) => run.notes === "Automated UI verification entry");
+  assert(verificationRun);
+  const deleteResponse = await page.request.delete(`http://localhost:3000/api/personal-runs/${verificationRun.id}`);
+  assert.equal(deleteResponse.status(), 204);
+  await page.screenshot({ path: path.join(output, "my-runs.png"), fullPage: true });
+
   const mobilePage = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
   mobilePage.on("pageerror", (error) => errors.push(error.message));
   await mobilePage.goto("http://localhost:3000", { waitUntil: "networkidle" });
@@ -86,6 +117,8 @@ try {
     augmentSearchResults,
     csvExportStatus: csvResponse.status(),
     yunaraHamstringerCards: await ownedCards.count(),
+    statLabSteps: 2,
+    personalRunApi: deleteResponse.status(),
     mobileDimensions,
     consoleErrors: errors.length,
   }, null, 2));

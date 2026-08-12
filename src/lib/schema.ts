@@ -120,4 +120,32 @@ CREATE TABLE IF NOT EXISTS video_champions (
 
 CREATE INDEX IF NOT EXISTS video_champions_video_idx ON video_champions(video_id);
 CREATE INDEX IF NOT EXISTS video_champions_champion_idx ON video_champions(champion_id);
+
+CREATE TABLE IF NOT EXISTS personal_runs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  played_at TEXT NOT NULL,
+  patch TEXT NOT NULL,
+  champion_id INTEGER NOT NULL REFERENCES champions(id),
+  placement INTEGER NOT NULL CHECK (placement BETWEEN 1 AND 16),
+  team_count INTEGER NOT NULL DEFAULT 8 CHECK (team_count BETWEEN 2 AND 16),
+  notes TEXT NOT NULL DEFAULT '',
+  source TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'riot', 'client')),
+  created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS personal_runs_played_idx ON personal_runs(played_at DESC);
+CREATE INDEX IF NOT EXISTS personal_runs_champion_idx ON personal_runs(champion_id);
+
+CREATE TABLE IF NOT EXISTS personal_run_entities (
+  run_id INTEGER NOT NULL REFERENCES personal_runs(id) ON DELETE CASCADE,
+  entity_key TEXT NOT NULL,
+  entity_name TEXT NOT NULL,
+  entity_kind TEXT NOT NULL CHECK (entity_kind IN ('augment', 'item')),
+  icon_url TEXT NOT NULL,
+  rarity TEXT NOT NULL,
+  pick_order INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY(run_id, entity_key)
+);
+
+CREATE INDEX IF NOT EXISTS personal_run_entities_entity_idx ON personal_run_entities(entity_key);
 `;

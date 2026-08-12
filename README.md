@@ -1,6 +1,6 @@
 # Arena Build Lab
 
-Local-first League of Legends Arena reference, evidence catalog, and build-combination explorer. It combines current CommunityDragon/Data Dragon records with an incremental King Nidhogg YouTube catalog and an auditable stat producer/consumer graph.
+Local-first League of Legends Arena reference, evidence catalog, stat-conversion calculator, personal match journal, and build-combination explorer. It combines current CommunityDragon/Data Dragon records with an incremental King Nidhogg YouTube catalog and an auditable stat producer/consumer graph.
 
 ## Start
 
@@ -22,9 +22,11 @@ Open <http://localhost:3000>.
 - Current champion, Arena augment, and map-30 item records in `data/arena.sqlite`.
 - Hand-verified conversion chains, exact YouTube-title build leads, and lower-confidence graph-discovered pairs shown as separate evidence classes.
 - Champion, build-goal, and text filters; every catalog card can jump directly into matching build paths.
+- An executable Stat Lab that chains current structured coefficients for high-value conversions such as mana → health → AD and AP → haste → movement → attack speed. Every result includes its arithmetic trace.
+- A local My Runs journal for champion, placement, items, augments, notes, and per-choice personal performance. These rates describe only the user's own saved matches and are never presented as global statistics.
 - Searchable video titles, descriptions, captions, exact entity mentions, champion links, and timestamped evidence.
 - A crash-safe incremental YouTube worker. Network requests run concurrently, while SQLite writes remain serialized.
-- Responsive local UI plus read-only JSON endpoints at `/api/catalog`, `/api/combos`, and `/api/videos`.
+- Responsive local UI plus JSON endpoints at `/api/catalog`, `/api/combos`, `/api/videos`, and `/api/personal-runs`.
 - One-click full CSV exports for augments, items, recommendations, and the video evidence catalog.
 
 ## Refresh workflows
@@ -50,6 +52,12 @@ Age-restricted videos are skipped unless a local browser cookie source is suppli
 - **Curated:** manually reviewed conversion chain, optionally tied to a specific video.
 - **Video-derived:** two or more current entity names matched exactly in a video title. Historical balance values may differ.
 - **Mechanically discovered:** current tooltip tags connect one entity's produced stat to another entity's consumed stat. These are leads, not claims of a proven run.
+
+## Local personal data
+
+`My runs` writes only to the ignored local file `data/arena.sqlite`. Static data refreshes preserve recorded run snapshots, even if an item or augment later changes or leaves the catalog. The personal dashboard reports sample size beside first-place rate, top-half rate, and average placement so small samples remain visible.
+
+The first Stat Lab formula set is intentionally narrower than the discovery graph. A formula is executable only when its operation and coefficient can be traced to structured current-patch data or explicit item text; regex-discovered relationships remain recommendations until they receive an executable definition and test.
 
 Run `npm run lint`, `npm test`, `npm run build`, and `npm run test:ui` for verification. With the local server running, `npm run audit:recommendations` exhaustively checks every champion and every owned item/augment for ownership leaks, exact-champion leaks, and duplicate recommendations. The UI test uses an installed Microsoft Edge build in headless mode.
 

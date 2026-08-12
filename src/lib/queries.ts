@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getDatabase, jsonArray } from "@/lib/db";
-import type { CatalogEntity, Champion, Combo, EntityKind, EntityOption, Video } from "@/lib/types";
+import type { CatalogEntity, Champion, Combo, EntityKind, EntityOption, StatFormula, StatKey, Video } from "@/lib/types";
 
 type EntityRow = Record<string, unknown>;
 
@@ -55,15 +55,106 @@ export function getOverview() {
 }
 
 export function getChampions(): Champion[] {
-  return (getDatabase().prepare("SELECT * FROM champions ORDER BY name").all() as EntityRow[]).map((row) => ({
-    id: Number(row.id),
-    key: String(row.champion_key),
-    name: String(row.name),
-    title: String(row.title),
-    partype: String(row.partype),
-    tags: jsonArray(row.tags_json),
-    iconUrl: String(row.icon_url),
-  }));
+  return (getDatabase().prepare("SELECT * FROM champions ORDER BY name").all() as EntityRow[]).map((row) => {
+    const rawStats = JSON.parse(String(row.stats_json ?? "{}")) as Record<string, unknown>;
+    const stat = (key: string) => Number(rawStats[key] ?? 0);
+    return {
+      id: Number(row.id),
+      key: String(row.champion_key),
+      name: String(row.name),
+      title: String(row.title),
+      partype: String(row.partype),
+      tags: jsonArray(row.tags_json),
+      iconUrl: String(row.icon_url),
+      stats: {
+        health: stat("hp"),
+        healthPerLevel: stat("hpperlevel"),
+        mana: stat("mp"),
+        manaPerLevel: stat("mpperlevel"),
+        attackDamage: stat("attackdamage"),
+        attackDamagePerLevel: stat("attackdamageperlevel"),
+        moveSpeed: stat("movespeed"),
+      },
+    };
+  });
+}
+
+type FormulaSpec = {
+  name: string;
+  kind: EntityKind;
+  sourceStat: StatKey;
+  targetStat: StatKey;
+  operation: StatFormula["operation"];
+  coefficientKey?: string;
+  coefficientScale?: number;
+  fixedCoefficient?: number;
+  multiplierKey?: string;
+  calculationCoefficient?: number;
+  description: string;
+  formulaText: string;
+  confidence: StatFormula["confidence"];
+  multiplierBaseStat?: StatKey;
+  order: number;
+};
+
+const FORMULA_SPECS: FormulaSpec[] = [
+  { name: "Mind to Matter", kind: "augment", sourceStat: "maxMana", targetStat: "bonusHealth", operation: "gain", coefficientKey: "Modifier", calculationCoefficient: 0.5, description: "Turns max mana into bonus max health.", formulaText: "Max mana × 0.5 × current Modifier", confidence: "exact", order: 10 },
+  { name: "Dreadbringer", kind: "augment", sourceStat: "cursedPower", targetStat: "bonusHealth", operation: "gain", coefficientKey: "MaxHealthRatio", description: "Adds max health for every point of Cursed Power.", formulaText: "Cursed Power × MaxHealthRatio", confidence: "exact", order: 11 },
+  { name: "ADAPt", kind: "augment", sourceStat: "bonusAttackDamage", targetStat: "abilityPower", operation: "convert", coefficientKey: "ConversionRate", multiplierKey: "APAmp", description: "Converts bonus AD into AP, then applies its AP amplifier.", formulaText: "(Existing AP + bonus AD × ConversionRate) × (1 + APAmp)", confidence: "exact", order: 20 },
+  { name: "escAPADe", kind: "augment", sourceStat: "abilityPower", targetStat: "bonusAttackDamage", operation: "convert", coefficientKey: "ConversionRate", multiplierKey: "ADAmp", multiplierBaseStat: "baseAttackDamage", description: "Converts AP into bonus AD, then applies its total-AD amplifier.", formulaText: "(Base AD + existing bonus AD + AP × ConversionRate) × (1 + ADAmp) − Base AD", confidence: "exact", order: 20 },
+  { name: "Overlord's Bloodmail", kind: "item", sourceStat: "bonusHealth", targetStat: "bonusAttackDamage", operation: "gain", fixedCoefficient: 0.03, description: "Tyranny adds AD equal to 3% of bonus health.", formulaText: "Bonus health × 0.03", confidence: "exact", order: 30 },
+  { name: "Eureka", kind: "augment", sourceStat: "abilityPower", targetStat: "abilityHaste", operation: "gain", coefficientKey: "APToHasteConversion", description: "Turns AP into ability haste.", formulaText: "Ability power × APToHasteConversion", confidence: "exact", order: 40 },
+  { name: "With Haste", kind: "augment", sourceStat: "abilityHaste", targetStat: "moveSpeed", operation: "gain", coefficientKey: "AbilityHasteToMSConversion", description: "Turns ability haste into flat move speed.", formulaText: "Ability haste × AbilityHasteToMSConversion", confidence: "exact", order: 50 },
+  { name: "Tap Dancer", kind: "augment", sourceStat: "moveSpeed", targetStat: "attackSpeedPercent", operation: "gain", coefficientKey: "MSToASConversion", coefficientScale: 100, description: "Turns move speed into bonus attack-speed percentage points.", formulaText: "Move speed × MSToASConversion × 100", confidence: "exact", order: 60 },
+  { name: "Aim for the Head", kind: "augment", sourceStat: "critChancePercent", targetStat: "critDamagePercent", operation: "overflow_crit", coefficientKey: "CritChanceToDamageRatio", description: "Adds 25% crit chance and damage, caps chance at 50%, then converts overflow chance into crit damage.", formulaText: "25 + max(0, crit chance + 25 - 50) × conversion ratio", confidence: "exact", order: 70 },
+  { name: "Heavy Hitter", kind: "augment", sourceStat: "maxHealth", targetStat: "onHitPhysicalDamage", operation: "derived_damage", coefficientKey: "HealthPercent", description: "Calculates the extra physical damage dealt by each attack.", formulaText: "Max health × HealthPercent", confidence: "exact", order: 80 },
+];
+
+function formulaRankIndices(maxLevel: number): number[] {
+  return Array.from({ length: Math.max(1, maxLevel) }, (_, level) => level + 1);
+}
+
+export function getStatFormulas(): StatFormula[] {
+  const db = getDatabase();
+  const select = db.prepare(`
+    SELECT entity_key, name, icon_url, patch, source_url, raw_json
+    FROM entities WHERE kind = ? AND lower(name) = lower(?)
+    ORDER BY purchasable DESC, numeric_id DESC LIMIT 1
+  `);
+  return FORMULA_SPECS.flatMap((spec) => {
+    const row = select.get(spec.kind, spec.name) as EntityRow | undefined;
+    if (!row) return [];
+    const raw = JSON.parse(String(row.raw_json)) as { dataValues?: Record<string, unknown> };
+    const values = raw.dataValues ?? {};
+    const maxLevelValues = values.MaxLevel;
+    const maxLevel = Array.isArray(maxLevelValues) ? Number(maxLevelValues[0] ?? 1) : 1;
+    const coefficients = spec.fixedCoefficient == null ? values[spec.coefficientKey ?? ""] : undefined;
+    const multipliers = spec.multiplierKey ? values[spec.multiplierKey] : undefined;
+    const coefficientValues = Array.isArray(coefficients) ? coefficients.map(Number) : [];
+    const multiplierValues = Array.isArray(multipliers) ? multipliers.map(Number) : [];
+    const ranks = formulaRankIndices(maxLevel).map((index, levelIndex) => ({
+      level: levelIndex + 1,
+      coefficient: (spec.fixedCoefficient ?? coefficientValues[index] ?? 0) * (spec.coefficientScale ?? 1) * (spec.calculationCoefficient ?? 1),
+      targetMultiplier: spec.multiplierKey ? 1 + (multiplierValues[index] ?? 0) : undefined,
+    }));
+    return [{
+      id: String(row.entity_key),
+      entityKey: String(row.entity_key),
+      entityName: String(row.name),
+      iconUrl: String(row.icon_url),
+      patch: String(row.patch),
+      sourceUrl: String(row.source_url),
+      sourceStat: spec.sourceStat,
+      targetStat: spec.targetStat,
+      operation: spec.operation,
+      ranks,
+      description: spec.description,
+      formulaText: spec.formulaText,
+      confidence: spec.confidence,
+      multiplierBaseStat: spec.multiplierBaseStat,
+      order: spec.order,
+    } satisfies StatFormula];
+  });
 }
 
 export function getEntityOptions(): EntityOption[] {

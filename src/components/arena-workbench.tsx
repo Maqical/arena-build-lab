@@ -2,7 +2,9 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import type { CatalogEntity, Champion, Combo, EntityOption, Video } from "@/lib/types";
+import { RunTracker } from "@/components/run-tracker";
+import { StatLab } from "@/components/stat-lab";
+import type { CatalogEntity, Champion, Combo, EntityOption, StatFormula, Video } from "@/lib/types";
 
 type Overview = {
   champions: number;
@@ -17,7 +19,7 @@ type Overview = {
   lastSync: string;
 };
 
-type View = "combos" | "augment" | "item" | "videos";
+type View = "combos" | "augment" | "item" | "videos" | "statlab" | "runs";
 
 const GOALS = [
   ["", "Any ceiling"],
@@ -144,11 +146,13 @@ export function ArenaWorkbench({
   overview,
   champions,
   entityOptions,
+  statFormulas,
   initialCombos,
 }: {
   overview: Overview;
   champions: Champion[];
   entityOptions: EntityOption[];
+  statFormulas: StatFormula[];
   initialCombos: Combo[];
 }) {
   const [view, setView] = useState<View>("combos");
@@ -172,6 +176,7 @@ export function ArenaWorkbench({
   );
 
   useEffect(() => {
+    if (view === "statlab" || view === "runs") return;
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       setLoading(true);
@@ -202,6 +207,7 @@ export function ArenaWorkbench({
     };
   }, [view, query, goal, champion, ownedEntityKey, showDiscovered]);
 
+  const explorerView = view === "combos" || view === "augment" || view === "item" || view === "videos";
   const resultCount = view === "combos" ? combos.length : view === "videos" ? videos.length : entities.length;
 
   return (
@@ -214,6 +220,8 @@ export function ArenaWorkbench({
             ["combos", "⌁", "Build paths"],
             ["augment", "✦", "Augments"],
             ["item", "◇", "Arena items"],
+            ["statlab", "∑", "Stat Lab"],
+            ["runs", "◎", "My runs"],
             ["videos", "▶", "Video evidence"],
           ] as const).map(([target, icon, label]) => (
             <button className={view === target ? "active" : ""} onClick={() => setView(target)} key={target}>
@@ -236,6 +244,7 @@ export function ArenaWorkbench({
           <div className="source-pill">CDragon + DDragon + video evidence</div>
         </header>
 
+        {explorerView && <>
         <section className="lab-panel">
           <div className="field champion-field">
             <label htmlFor="champion">Champion</label>
@@ -335,6 +344,10 @@ export function ArenaWorkbench({
             </div>
           )}
         </section>
+        </>}
+
+        {view === "statlab" && <StatLab champions={champions} formulas={statFormulas} initialChampionKey={champion} />}
+        {view === "runs" && <RunTracker champions={champions} entityOptions={entityOptions} initialChampionKey={champion} />}
 
         <footer>
           Arena Build Lab is not endorsed by Riot Games. Calculations and extracted evidence remain patch-stamped and auditable.

@@ -46,6 +46,109 @@ export type Champion = {
   partype: string;
   tags: string[];
   iconUrl: string;
+  stats: {
+    health: number;
+    healthPerLevel: number;
+    mana: number;
+    manaPerLevel: number;
+    attackDamage: number;
+    attackDamagePerLevel: number;
+    moveSpeed: number;
+  };
+};
+
+export type StatKey =
+  | "maxHealth"
+  | "bonusHealth"
+  | "maxMana"
+  | "baseAttackDamage"
+  | "bonusAttackDamage"
+  | "abilityPower"
+  | "abilityHaste"
+  | "moveSpeed"
+  | "attackSpeedPercent"
+  | "critChancePercent"
+  | "critDamagePercent"
+  | "cursedPower"
+  | "onHitPhysicalDamage";
+
+export type StatValues = Record<StatKey, number>;
+
+export type FormulaRank = {
+  level: number;
+  coefficient: number;
+  targetMultiplier?: number;
+};
+
+export type StatFormula = {
+  id: string;
+  entityKey: string;
+  entityName: string;
+  iconUrl: string;
+  patch: string;
+  sourceUrl: string;
+  sourceStat: StatKey;
+  targetStat: StatKey;
+  operation: "gain" | "convert" | "overflow_crit" | "derived_damage";
+  ranks: FormulaRank[];
+  description: string;
+  formulaText: string;
+  confidence: "exact" | "conditional";
+  multiplierBaseStat?: StatKey;
+  order: number;
+};
+
+export type FormulaSelection = { formulaId: string; level: number };
+
+export type CalculationStep = {
+  formulaId: string;
+  entityName: string;
+  expression: string;
+  sourceValue: number;
+  delta: number;
+  targetStat: StatKey;
+  resultValue: number;
+};
+
+export type CalculationResult = {
+  stats: StatValues;
+  steps: CalculationStep[];
+  warnings: string[];
+};
+
+export type PersonalRunEntity = EntityOption & { pickOrder: number };
+
+export type PersonalRun = {
+  id: number;
+  playedAt: string;
+  patch: string;
+  champion: Pick<Champion, "id" | "key" | "name" | "iconUrl">;
+  placement: number;
+  teamCount: number;
+  notes: string;
+  source: "manual" | "riot" | "client";
+  entities: PersonalRunEntity[];
+};
+
+export type PersonalEntityPerformance = {
+  entityKey: string;
+  name: string;
+  kind: EntityKind;
+  iconUrl: string;
+  games: number;
+  wins: number;
+  winRate: number;
+  topHalfRate: number;
+  averagePlacement: number;
+};
+
+export type PersonalStats = {
+  totalRuns: number;
+  wins: number;
+  winRate: number;
+  topHalfRate: number;
+  averagePlacement: number;
+  entityPerformance: PersonalEntityPerformance[];
 };
 
 export type Video = {
