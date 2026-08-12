@@ -4,6 +4,7 @@ out/
 .venv/
 data/*.sqlite
 data/*.sqlite-*
+data/extreme-builds-*.csv
 data/cache/
 *.log
 .env*

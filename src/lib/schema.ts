@@ -148,4 +148,30 @@ CREATE TABLE IF NOT EXISTS personal_run_entities (
 );
 
 CREATE INDEX IF NOT EXISTS personal_run_entities_entity_idx ON personal_run_entities(entity_key);
+
+CREATE TABLE IF NOT EXISTS extreme_builds (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  champion_key TEXT NOT NULL,
+  champion_name TEXT NOT NULL,
+  level INTEGER NOT NULL,
+  objective TEXT NOT NULL,
+  result_rank INTEGER NOT NULL,
+  score REAL NOT NULL,
+  theoretical_unbounded INTEGER NOT NULL DEFAULT 0,
+  unbounded_reason TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL,
+  stats_json TEXT NOT NULL,
+  augment_keys_json TEXT NOT NULL,
+  augments_json TEXT NOT NULL,
+  scenario_name TEXT NOT NULL,
+  scenario_json TEXT NOT NULL,
+  iterations INTEGER NOT NULL,
+  delta REAL NOT NULL,
+  patch TEXT NOT NULL,
+  generated_at TEXT NOT NULL,
+  UNIQUE(champion_key, objective, result_rank, scenario_name, patch)
+);
+
+CREATE INDEX IF NOT EXISTS extreme_builds_lookup_idx
+ON extreme_builds(objective, champion_key, scenario_name, result_rank);
 `;

@@ -24,6 +24,7 @@ Open <http://localhost:3000>.
 - Champion, build-goal, and text filters; every catalog card can jump directly into matching build paths.
 - An executable Stat Lab that chains current structured coefficients for high-value conversions such as mana → health → AD and AP → haste → movement → attack speed. Every result includes its arithmetic trace.
 - A local My Runs journal for champion, placement, items, augments, notes, and per-choice personal performance. These rates describe only the user's own saved matches and are never presented as global statistics.
+- A pure fixed-point resolver for recursive stat graphs plus an offline extreme-build search covering 1 Prismatic, 2 Gold, and 1 Silver augment slots.
 - Searchable video titles, descriptions, captions, exact entity mentions, champion links, and timestamped evidence.
 - A crash-safe incremental YouTube worker. Network requests run concurrently, while SQLite writes remain serialized.
 - Responsive local UI plus JSON endpoints at `/api/catalog`, `/api/combos`, `/api/videos`, and `/api/personal-runs`.
@@ -58,6 +59,33 @@ Age-restricted videos are skipped unless a local browser cookie source is suppli
 `My runs` writes only to the ignored local file `data/arena.sqlite`. Static data refreshes preserve recorded run snapshots, even if an item or augment later changes or leaves the catalog. The personal dashboard reports sample size beside first-place rate, top-half rate, and average placement so small samples remain visible.
 
 The first Stat Lab formula set is intentionally narrower than the discovery graph. A formula is executable only when its operation and coefficient can be traced to structured current-patch data or explicit item text; regex-discovered relationships remain recommendations until they receive an executable definition and test.
+
+## Extreme build engine
+
+Run the current-patch theoretical benchmark and write its top-100 review CSV:
+
+```powershell
+npm run extremes
+```
+
+This runs `scripts/generate-extreme-builds.ts`, stores ranked results in the local `extreme_builds` table, and writes `data/extreme-builds-top-100.csv`. You can restrict generation to named champions:
+
+```powershell
+npm run extremes:build -- Sion Chogath
+npm run extremes:export -- --objective=maxHealth --output=data/my-health-builds.csv
+```
+
+The default benchmark evaluates Sion, Cho'Gath, Swain, Shyvana, Senna, and Thresh at level 18. It exhaustively combines the 26 currently executable stat-changing augments under the `1 Prismatic + 2 Gold + 1 Silver` constraint. Non-stat augments are omitted as mathematically equivalent no-op fillers for these objectives. Overlord's Bloodmail is included as a fixed conversion item, with Retribution evaluated at its stated maximum. Scenario-dependent inputs are recorded with every row: 48,000 pre-quest Heartsteel stacks, 24 takedowns, 500 Cursed Power, 100 Phenomenal Evil procs, 13,200 Sion small-unit Soul Furnace stacks, and 50 Cho'Gath champion Feast stacks.
+
+Those inputs make runs reproducible; they are not claims about an ordinary match. Sion and Cho'Gath health-derived objectives are also marked `theoreticalUnbounded`, because without a time/stack boundary no finite absolute maximum exists. The resolver similarly reports non-contracting conversion cycles as divergent instead of inventing a final number.
+
+Query stored results from the app:
+
+```text
+GET /api/extreme-builds?champion=Sion&objective=maxHealth&limit=10
+```
+
+Valid objectives are `maxHealth`, `totalAttackDamage`, `abilityPower`, `abilityHaste`, `moveSpeed`, `attackSpeed`, `critDamagePercent`, and `onHitPhysicalDamage`.
 
 Run `npm run lint`, `npm test`, `npm run build`, and `npm run test:ui` for verification. With the local server running, `npm run audit:recommendations` exhaustively checks every champion and every owned item/augment for ownership leaks, exact-champion leaks, and duplicate recommendations. The UI test uses an installed Microsoft Edge build in headless mode.
 

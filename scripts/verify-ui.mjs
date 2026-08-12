@@ -54,6 +54,13 @@ try {
   assert.equal(csvResponse.status(), 200);
   assert.match(csvResponse.headers()["content-type"], /text\/csv/);
 
+  const extremeResponse = await page.request.get("http://localhost:3000/api/extreme-builds?champion=Sion&objective=maxHealth&limit=2");
+  assert.equal(extremeResponse.status(), 200);
+  const extremePayload = await extremeResponse.json();
+  assert.equal(extremePayload.builds.length, 2);
+  assert.equal(extremePayload.builds[0].theoreticalUnbounded, true);
+  assert(extremePayload.builds[0].score > 650000);
+
   const ownedPage = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
   ownedPage.on("pageerror", (error) => errors.push(error.message));
   await ownedPage.goto("http://localhost:3000", { waitUntil: "networkidle" });
@@ -116,6 +123,7 @@ try {
     sionVideoCards,
     augmentSearchResults,
     csvExportStatus: csvResponse.status(),
+    extremeBuildApiStatus: extremeResponse.status(),
     yunaraHamstringerCards: await ownedCards.count(),
     statLabSteps: 2,
     personalRunApi: deleteResponse.status(),
