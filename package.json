@@ -1,0 +1,40 @@
+{
+  "name": "arena-build-lab",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "test": "tsx --test tests/*.test.ts",
+    "test:ui": "node scripts/verify-ui.mjs",
+    "audit:recommendations": "node scripts/audit-recommendations.mjs",
+    "data:sync": "tsx scripts/sync-data.ts",
+    "youtube:sync": ".venv\\Scripts\\python.exe workers/youtube_catalog.py --details-limit 20 --transcripts",
+    "youtube:link": ".venv\\Scripts\\python.exe workers/youtube_catalog.py --link-only && npm run videos:combos",
+    "videos:combos": "tsx scripts/sync-video-combos.ts",
+    "setup": "npm run data:sync"
+  },
+  "dependencies": {
+    "next": "16.3.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "eslint": "9.39.2",
+    "eslint-config-next": "16.3.0",
+    "playwright-core": "^1.61.0",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3"
+  },
+  "overrides": {
+    "esbuild": "0.28.1"
+  }
+}

@@ -1,0 +1,21 @@
+node_modules/
+.next/
+out/
+.venv/
+data/*.sqlite
+data/*.sqlite-*
+data/cache/
+*.log
+.env*
+!.env.example
+qa/*.png
+qa/*.log
+__pycache__/
+*.py[cod]
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local AI/operator context; AGENTS.md is the project-scoped contributor guide.
+AGENT.md
