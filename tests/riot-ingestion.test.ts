@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 import { DatabaseSync } from "node:sqlite";
 import { parseRiotMatch } from "../src/lib/riot/arena-match";
 import { insertLiveObservation, mergeObservedMaxima } from "../src/lib/live-observations";
+import { calculateMeta } from "../src/lib/meta-aggregation";
 import { cohortMembers, ingestCohortMember, insertParsedMatch, upsertCohortMember } from "../src/lib/riot/ingestion";
 import { parseRiotId, platformFromTagLine, RiotApiClient } from "../src/lib/riot/riot-api";
 import { SCHEMA_SQL } from "../src/lib/schema";
@@ -123,4 +126,39 @@ test("records peak live stats without losing an earlier transient maximum", () =
   assert.equal(row.observed_max_ad, 9000);
   assert.equal(row.augment_ids_json, '["augment:1","augment:2"]');
   db.close();
+});
+
+test("aggregates local first-place, top-four, and pick-rate snapshots idempotently", () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "arena-meta-"));
+  const filename = path.join(directory, "arena.sqlite");
+  const db = new DatabaseSync(filename);
+  db.exec(SCHEMA_SQL);
+  const match = parseRiotMatch(fixture, { routingRegion: "asia", platform: "kr" });
+  insertParsedMatch(db, match);
+  const second = structuredClone(match);
+  second.matchId = "KR_1234567891";
+  const fixtureRecord = fixture as { metadata: Record<string, unknown> };
+  second.rawJson = JSON.stringify({ ...fixtureRecord, metadata: { ...fixtureRecord.metadata, matchId: second.matchId } });
+  second.rawJsonHash = "second-hash";
+  second.participants = second.participants.map((participant) => ({ ...participant, placement: participant.placement === 1 ? 2 : 1, won: participant.placement !== 1 }));
+  insertParsedMatch(db, second);
+  db.close();
+  const summary = calculateMeta(filename);
+  const output = new DatabaseSync(filename, { readOnly: true });
+  const stats = output.prepare(`
+    SELECT metric, value, sample_size FROM meta_snapshots
+    WHERE entity_key = 'augment:137000' AND champion_id IS NULL
+  `).all() as Array<{ metric: string; value: number; sample_size: number }>;
+  assert.equal(summary.matches, 2);
+  assert.equal(stats.find((row) => row.metric === "win_rate")?.value, 0.5);
+  assert.equal(stats.find((row) => row.metric === "top4_rate")?.value, 1);
+  assert.equal(stats.find((row) => row.metric === "win_rate")?.sample_size, 2);
+  const firstCount = Number((output.prepare("SELECT COUNT(*) AS count FROM meta_snapshots").get() as { count: number }).count);
+  output.close();
+  calculateMeta(filename);
+  const rerun = new DatabaseSync(filename, { readOnly: true });
+  const secondCount = Number((rerun.prepare("SELECT COUNT(*) AS count FROM meta_snapshots").get() as { count: number }).count);
+  rerun.close();
+  assert.equal(secondCount, firstCount);
+  fs.rmSync(directory, { recursive: true, force: true });
 });

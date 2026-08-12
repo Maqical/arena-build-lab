@@ -69,3 +69,8 @@ export function jsonArray(value: unknown): string[] {
     return [];
   }
 }
+
+/** Returns whether the replaceable local Riot projection has any rows. */
+export function hasLocalMetaSnapshots(): boolean {
+  return Number(getDatabase().prepare("SELECT COUNT(*) AS count FROM meta_snapshots WHERE source = 'riot_api_local'").get()?.count ?? 0) > 0;
+}

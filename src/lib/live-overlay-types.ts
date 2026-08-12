@@ -37,4 +37,8 @@ export type ArenaMetaRecord = {
   sourceName: string;
   sourceUrl: string;
   fetchedAt: string;
+  region?: string;
+  platform?: string;
+  sampleSize?: number;
+  metricDefinition?: string;
 };

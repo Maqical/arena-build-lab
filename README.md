@@ -41,10 +41,12 @@ The checked-in parser fixture is schema-faithful and contains no real player dat
 - An executable Stat Lab that chains current structured coefficients for high-value conversions such as mana → health → AD and AP → haste → movement → attack speed. Every result includes its arithmetic trace.
 - A local My Runs journal for champion, placement, items, augments, notes, and per-choice personal performance. These rates describe only the user's own saved matches and are never presented as global statistics.
 - An immutable Riot Match-v5 warehouse with source region/platform, raw response hashes, participant augment/item snapshots, resumable cohort checkpoints, and rate-limit-aware ingestion.
+- A repeatable local meta projection with first-place rate, Top 4 rate, pick rate, region/patch grouping, and a compatibility fallback to the legacy `arena_meta` source.
 - A pure fixed-point resolver for recursive stat graphs plus an offline extreme-build search covering 1 Prismatic, 2 Gold, and 1 Silver augment slots.
 - A live three-offer draft picker with local stat deltas, current item/augment context, optional screenshot extraction, and a structured OpenAI recommendation with a deterministic no-key fallback.
 - A compact live companion overlay with automatic League lockfile discovery, reconnect backoff, Arena phase detection, SSE updates, current-game stats, and resolver-powered Craze Factor.
 - Local Live Client peak-stat observations persisted at Arena game end, preserving transient maxima such as HP or AD that may not appear in the end-of-game Match-v5 payload.
+- `/history` for personal Riot-ingested games and `/trophies` for the top ten locally recorded HP, AD, and AP peaks.
 - A sortable Extreme Build Browser that exposes the 658k-HP Sion benchmark and every row in `data/extreme_builds.csv`.
 - A Champion Select assistant with automatic hover/lock detection, extreme targets, augment/item anchors, and clearly labeled role-plus-meta duo candidates.
 - A clipboard-image picker in the overlay: take a snip with `Win+Shift+S`, focus the overlay, then press `Ctrl+Shift+A`, paste normally, or click **Paste augment snip**.
@@ -61,6 +63,9 @@ npm run data:sync
 
 # Refresh champion win/pick/tier and augment pick/tier labels used by the overlay
 npm run meta:sync
+
+# Aggregate immutable Riot Arena matches into local meta snapshots
+npm run meta:calculate
 
 # Enrich 20 more incomplete uploads with descriptions and English captions
 npm run youtube:sync

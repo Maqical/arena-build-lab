@@ -106,6 +106,7 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
     [champions, snapshot?.champion.id, snapshot?.champion.name],
   );
   const championMeta = champion ? metaLookup.get(`champion:${champion.key}`) : undefined;
+  const championMetaPercent = championMeta?.winRate == null ? null : championMeta.sourceName === "riot_api_local" ? championMeta.winRate * 100 : championMeta.winRate;
   const displayedOffers = useMemo(() => {
     if (offered.length > 0) return offered;
     if (!recommendation?.screenshotExtracted) return [];
@@ -176,7 +177,7 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
       <section className="overlay-champion">
         {champion ? <Image src={champion.iconUrl} alt="" width={42} height={42} unoptimized /> : <div className="overlay-champion-placeholder">?</div>}
         <div><span>Level {snapshot?.champion.level ?? 1}</span><h1>{champion?.name || snapshot?.champion.name || "No champion"}</h1></div>
-        {championMeta && <a href={championMeta.sourceUrl} target="_blank" rel="noreferrer"><strong>{championMeta.winRate?.toFixed(1)}%</strong><span>Meta WR · {championMeta.tier}</span></a>}
+        {championMeta && <a href={championMeta.sourceUrl} target="_blank" rel="noreferrer"><strong>{championMetaPercent?.toFixed(1)}%</strong><span>{championMeta.sourceName === "riot_api_local" ? `Local WR · ${championMeta.sampleSize ?? 0} games` : `Meta WR · ${championMeta.tier}`}</span></a>}
       </section>
 
       {snapshot?.phase === "champ_select" ? <ChampSelectAssistant champions={champions} snapshot={snapshot} compact /> : snapshot?.phase === "augment_select" || displayedOffers.length > 0 ? (
@@ -186,9 +187,14 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
             const result = recommendation?.options.find((option) => option.entity.entityKey === entity.entityKey);
             const augmentMeta = metaLookup.get(entity.entityKey);
             const recommended = recommendation?.recommendation.entityKey === entity.entityKey;
+            const localMetaBadge = augmentMeta?.sourceName === "riot_api_local"
+              ? augmentMeta.sampleSize != null && augmentMeta.sampleSize >= 20
+                ? `${augmentMeta.winRate == null ? "—" : `${(augmentMeta.winRate * 100).toFixed(1)}%`} WR · Local Cohort: ${augmentMeta.sampleSize} games`
+                : "Low Sample"
+              : "";
             return <article className={recommended ? "best" : ""} key={entity.entityKey}>
               <Image src={entity.iconUrl} alt="" width={34} height={34} unoptimized />
-              <div><span>{String.fromCharCode(65 + index)} · {entity.rarity}{augmentMeta ? ` · ${augmentMeta.tier} tier / ${augmentMeta.pickRate?.toFixed(1)}% PR` : ""}</span><strong>{entity.name}</strong></div>
+              <div><span>{String.fromCharCode(65 + index)} · {entity.rarity}{augmentMeta && augmentMeta.sourceName !== "riot_api_local" ? ` · ${augmentMeta.tier} tier / ${augmentMeta.pickRate?.toFixed(1)}% PR` : ""}</span><strong>{entity.name}</strong>{localMetaBadge && <small className={`overlay-meta-badge ${localMetaBadge === "Low Sample" ? "low" : ""}`}>{localMetaBadge}</small>}</div>
               <dl><div><dt>HP</dt><dd>{result ? `${result.deltas.maxHealth >= 0 ? "+" : ""}${display(result.deltas.maxHealth)}` : "—"}</dd></div><div><dt>AD</dt><dd>{result ? `${result.deltas.totalAttackDamage >= 0 ? "+" : ""}${display(result.deltas.totalAttackDamage, 1)}` : "—"}</dd></div><div><dt>AP</dt><dd>{result ? `${result.deltas.abilityPower >= 0 ? "+" : ""}${display(result.deltas.abilityPower, 1)}` : "—"}</dd></div></dl>
             </article>;
           })}
