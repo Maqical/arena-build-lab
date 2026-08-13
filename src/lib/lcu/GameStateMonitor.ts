@@ -282,6 +282,10 @@ export class GameStateMonitor extends EventEmitter {
     connector.on("json-api-event", (event: LcuJsonApiEvent) => this.onLcuEvent(event));
     connector.on("connect", () => void this.refresh());
     connector.on("disconnect", () => void this.refresh());
+    connector.on("connection-lost", () => {
+      this.emit("ConnectionLost", this.snapshot());
+      void this.refresh();
+    });
   }
 
   snapshot(): GameStateSnapshot {

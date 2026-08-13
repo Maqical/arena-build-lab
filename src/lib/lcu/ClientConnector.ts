@@ -36,8 +36,7 @@ type LcuCredentials = {
 };
 
 export type ClientConnectorOptions = {
-  retryBaseMs?: number;
-  retryMaxMs?: number;
+  retryIntervalMs?: number;
   additionalLockfiles?: string[];
 };
 
@@ -109,13 +108,14 @@ export async function leagueLockfileCandidates(additional: readonly string[] = [
 }
 
 export class ClientConnector extends EventEmitter {
-  private readonly retryBaseMs: number;
-  private readonly retryMaxMs: number;
+  private readonly retryIntervalMs: number;
   private readonly additionalLockfiles: string[];
   private credentials: LcuCredentials | null = null;
   private socket: WebSocket | null = null;
   private running = false;
   private loopPromise: Promise<void> | null = null;
+  private retryTimer: NodeJS.Timeout | null = null;
+  private cancelRetry: (() => void) | null = null;
   private status: LcuConnectorStatus = {
     state: "stopped",
     connected: false,
@@ -129,8 +129,7 @@ export class ClientConnector extends EventEmitter {
 
   constructor(options: ClientConnectorOptions = {}) {
     super();
-    this.retryBaseMs = Math.max(250, options.retryBaseMs ?? 1_000);
-    this.retryMaxMs = Math.max(this.retryBaseMs, options.retryMaxMs ?? 15_000);
+    this.retryIntervalMs = Math.max(250, options.retryIntervalMs ?? 5_000);
     this.additionalLockfiles = options.additionalLockfiles ?? [];
   }
 
@@ -146,11 +145,16 @@ export class ClientConnector extends EventEmitter {
 
   async stop(): Promise<void> {
     this.running = false;
+    this.cancelRetry?.();
+    this.cancelRetry = null;
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    this.retryTimer = null;
     this.socket?.close();
     this.socket = null;
     this.credentials = null;
     this.setStatus({ state: "stopped", connected: false, port: null, retryInMs: null });
     await this.loopPromise;
+    this.loopPromise = null;
   }
 
   async requestJson<T>(endpoint: string, allowNotFound = true): Promise<T | null> {
@@ -210,11 +214,24 @@ export class ClientConnector extends EventEmitter {
         if (!this.running) break;
         this.credentials = null;
         attempt += 1;
-        const retryInMs = Math.min(this.retryMaxMs, this.retryBaseMs * 2 ** Math.min(attempt - 1, 5));
+        const retryInMs = this.retryIntervalMs;
         this.setStatus({ state: "retrying", connected: false, port: null, attempt, retryInMs, lastError: messageOf(error) });
-        await new Promise((resolve) => setTimeout(resolve, retryInMs));
+        await this.waitForRetry(retryInMs);
       }
     }
+  }
+
+  private waitForRetry(delayMs: number): Promise<void> {
+    return new Promise((resolve) => {
+      const finish = () => {
+        if (this.retryTimer) clearTimeout(this.retryTimer);
+        this.retryTimer = null;
+        this.cancelRetry = null;
+        resolve();
+      };
+      this.cancelRetry = finish;
+      this.retryTimer = setTimeout(finish, delayMs);
+    });
   }
 
   private openEventSocket(credentials: LcuCredentials): Promise<void> {
@@ -245,7 +262,9 @@ export class ClientConnector extends EventEmitter {
         this.credentials = null;
         this.setStatus({ connected: false, port: null });
         this.emit("disconnect");
+        if (opened && this.running) this.emit("connection-lost");
         if (opened) resolve();
+        else reject(new Error("League Client event socket closed before connecting."));
       });
     });
   }

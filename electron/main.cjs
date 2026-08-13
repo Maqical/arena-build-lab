@@ -1,31 +1,77 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
-const { app, BrowserWindow, Tray, Menu, globalShortcut, desktopCapturer, clipboard, nativeImage, screen, ipcMain } = require("electron");
+const { app, BrowserWindow, Tray, Menu, globalShortcut, desktopCapturer, clipboard, nativeImage, screen, ipcMain, utilityProcess } = require("electron");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const http = require("node:http");
+const { normalizedBounds, defaultOverlayBounds: makeDefaultOverlayBounds, visibleOverlayBounds: restoreVisibleBounds } = require("./window-state.cjs");
+
+app.setName("Arena Build Lab");
 
 const PORT = Number(process.env.ARENA_ELECTRON_PORT || 3210);
 const OBS_MODE = process.argv.includes("--obs");
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
 let serverProcess;
 let mainWindow;
 let tray;
 let appearance = { opacity: 1, scale: 1 };
 let dataInitializing = false;
+let windowMode = "overlay";
+let applyingWindowBounds = false;
+let boundsSaveTimer;
 const settingsPath = () => path.join(app.getPath("userData"), "user_settings.json");
+
+function defaultSettings() {
+  return { riotApiKey: process.env.RIOT_API_KEY || "", openAiApiKey: process.env.OPENAI_API_KEY || "", opacity: 1, scale: 1, openAtLogin: false, overlayBounds: null };
+}
 
 function readSettings() {
   try {
     const value = JSON.parse(fs.readFileSync(settingsPath(), "utf8"));
-    return { riotApiKey: String(value.riotApiKey ?? ""), openAiApiKey: String(value.openAiApiKey ?? ""), opacity: Number(value.opacity ?? 1), scale: Number(value.scale ?? 1), openAtLogin: Boolean(value.openAtLogin) };
-  } catch { return { riotApiKey: process.env.RIOT_API_KEY || "", openAiApiKey: process.env.OPENAI_API_KEY || "", opacity: 1, scale: 1, openAtLogin: false }; }
+    return { riotApiKey: String(value.riotApiKey ?? ""), openAiApiKey: String(value.openAiApiKey ?? ""), opacity: Number(value.opacity ?? 1), scale: Number(value.scale ?? 1), openAtLogin: Boolean(value.openAtLogin), overlayBounds: normalizedBounds(value.overlayBounds) };
+  } catch { return defaultSettings(); }
 }
 
 function writeSettings(next) {
   const current = readSettings();
-  const value = { ...current, ...next, opacity: Math.min(1, Math.max(0, Number(next.opacity ?? current.opacity))), scale: Math.min(1.5, Math.max(.75, Number(next.scale ?? current.scale))) };
+  const value = { ...current, ...next, opacity: Math.min(1, Math.max(0, Number(next.opacity ?? current.opacity))), scale: Math.min(1.5, Math.max(.75, Number(next.scale ?? current.scale))), overlayBounds: normalizedBounds(next.overlayBounds ?? current.overlayBounds) };
+  fs.mkdirSync(path.dirname(settingsPath()), { recursive: true });
   fs.writeFileSync(settingsPath(), JSON.stringify(value, null, 2), "utf8");
   return value;
+}
+
+function defaultOverlayBounds(scale = appearance.scale) {
+  return makeDefaultOverlayBounds(screen.getPrimaryDisplay().workArea, scale);
+}
+
+function visibleOverlayBounds(saved, scale = appearance.scale) {
+  return restoreVisibleBounds(saved, [screen.getPrimaryDisplay(), ...screen.getAllDisplays().filter((display) => display.id !== screen.getPrimaryDisplay().id)], scale);
+}
+
+function persistOverlayBoundsSoon() {
+  if (windowMode !== "overlay" || applyingWindowBounds || !mainWindow || mainWindow.isDestroyed()) return;
+  clearTimeout(boundsSaveTimer);
+  boundsSaveTimer = setTimeout(() => {
+    boundsSaveTimer = undefined;
+    if (windowMode === "overlay" && mainWindow && !mainWindow.isDestroyed()) writeSettings({ overlayBounds: mainWindow.getBounds() });
+  }, 250);
+}
+
+function setWindowBounds(bounds) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  applyingWindowBounds = true;
+  mainWindow.setBounds(bounds);
+  applyingWindowBounds = false;
+}
+
+function resetOverlayPosition() {
+  const bounds = defaultOverlayBounds();
+  writeSettings({ overlayBounds: bounds });
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    windowMode = "overlay";
+    setWindowBounds(bounds);
+    openOverlay();
+  }
 }
 
 function rootPath(...parts) { return path.join(app.isPackaged ? process.resourcesPath : path.resolve(__dirname, ".."), ...parts); }
@@ -47,28 +93,28 @@ function spawnWorker(worker) {
   const settings = readSettings();
   const env = { ...process.env, RIOT_API_KEY: settings.riotApiKey, OPENAI_API_KEY: settings.openAiApiKey, ARENA_DB_PATH: path.join(app.getPath("userData"), "data", "arena.sqlite") };
   if (app.isPackaged) {
-    if (worker === "youtube") return spawn(packagedWorker("arena-youtube-sync.exe"), ["--database", env.ARENA_DB_PATH, "--details-limit", "20", "--transcripts"], { env, windowsHide: true, stdio: "ignore" });
+    if (worker === "youtube") return { child: spawn(packagedWorker("arena-youtube-sync.exe"), ["--database", env.ARENA_DB_PATH, "--details-limit", "20", "--transcripts"], { env, windowsHide: true, stdio: "ignore" }), exitEvent: "close" };
     const script = worker === "riot" ? packagedWorker("riot-sync.cjs") : packagedWorker("data-sync.cjs");
-    return spawn(process.execPath, [script], { env: { ...env, ELECTRON_RUN_AS_NODE: "1" }, cwd: app.getPath("userData"), windowsHide: true, stdio: "ignore" });
+    return { child: utilityProcess.fork(script, [], { env, cwd: app.getPath("userData"), stdio: "ignore", serviceName: `Arena ${worker} worker` }), exitEvent: "exit" };
   }
   const command = worker === "youtube" ? "youtube:sync" : worker === "riot" ? "riot:sync" : "data:sync";
   const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-  return spawn(npm, ["run", command], { cwd: path.resolve(__dirname, ".."), env, detached: true, stdio: "ignore", windowsHide: true });
+  return { child: spawn(npm, ["run", command], { cwd: path.resolve(__dirname, ".."), env, detached: true, stdio: "ignore", windowsHide: true }), exitEvent: "close" };
 }
 
 function initializeDataIfNeeded() {
   const database = prepareUserData();
   if (fs.existsSync(database) || dataInitializing) return;
   dataInitializing = true;
-  const child = spawnWorker("data");
-  child.on("close", () => { dataInitializing = false; if (mainWindow && !mainWindow.isDestroyed()) openOverlay(); });
+  const worker = spawnWorker("data");
+  worker.child.on(worker.exitEvent, () => { dataInitializing = false; if (mainWindow && !mainWindow.isDestroyed()) openOverlay(); });
 }
 
 function startNext() {
   const settings = readSettings();
   const env = { ...process.env, PORT: String(PORT), HOSTNAME: "127.0.0.1", ARENA_DB_PATH: prepareUserData(), NEXT_TELEMETRY_DISABLED: "1", RIOT_API_KEY: settings.riotApiKey, OPENAI_API_KEY: settings.openAiApiKey };
   if (app.isPackaged) {
-    serverProcess = spawn(process.execPath, [rootPath("standalone", "server.js")], { cwd: rootPath("standalone"), env, stdio: "ignore" });
+    serverProcess = utilityProcess.fork(rootPath("standalone", "server.js"), [], { cwd: rootPath("standalone"), env, stdio: "ignore", serviceName: "Arena local server" });
   } else {
     serverProcess = spawn(process.execPath, [path.join(process.cwd(), "node_modules", "next", "dist", "bin", "next"), "start", "-p", String(PORT)], { cwd: process.cwd(), env, stdio: "ignore", shell: false });
   }
@@ -80,12 +126,15 @@ async function restartNext() {
   await waitForServer();
 }
 
-function applyAppearance(next) {
+function applyAppearance(next, resizeWindow = true) {
   appearance = { opacity: Math.min(1, Math.max(0, Number(next.opacity))), scale: Math.min(1.5, Math.max(.75, Number(next.scale))) };
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.setOpacity(appearance.opacity);
-    const bounds = mainWindow.getBounds();
-    mainWindow.setBounds({ ...bounds, width: Math.round(300 * appearance.scale), height: Math.round(600 * appearance.scale) });
+    if (resizeWindow && windowMode === "overlay") {
+      const bounds = mainWindow.getBounds();
+      setWindowBounds({ ...bounds, width: Math.round(300 * appearance.scale), height: Math.round(600 * appearance.scale) });
+    }
+    if (windowMode === "overlay") writeSettings({ opacity: appearance.opacity, scale: appearance.scale, overlayBounds: mainWindow.getBounds() });
     void mainWindow.webContents.executeJavaScript(`document.documentElement.style.zoom = ${appearance.scale}`);
   }
   return { ok: true };
@@ -118,13 +167,16 @@ async function capturePicker() {
 }
 
 function createWindow() {
+  const initialBounds = visibleOverlayBounds(readSettings().overlayBounds);
   mainWindow = new BrowserWindow({
-    width: 300, height: 600, minWidth: 300, maxWidth: 300, minHeight: 400,
+    ...initialBounds, minWidth: 225, minHeight: 300,
     frame: false, transparent: OBS_MODE, alwaysOnTop: !OBS_MODE, resizable: false,
     backgroundColor: OBS_MODE ? "#00FF00" : "#100d17",
     webPreferences: { contextIsolation: true, nodeIntegration: false, preload: path.join(__dirname, "preload.cjs") },
   });
   mainWindow.setMenuBarVisibility(false);
+  mainWindow.on("move", persistOverlayBoundsSoon);
+  mainWindow.on("resize", persistOverlayBoundsSoon);
   mainWindow.on("close", (event) => { if (!app.isQuitting) { event.preventDefault(); mainWindow.hide(); } });
   mainWindow.loadURL(`http://127.0.0.1:${PORT}/overlay${OBS_MODE ? "?obs=1" : dataInitializing ? "?welcome=1" : ""}`);
   mainWindow.webContents.on("did-finish-load", () => {
@@ -132,21 +184,24 @@ function createWindow() {
       ? `html,body,.overlay-page{background:#00FF00!important}.overlay-topline,footer{display:none!important}.live-overlay{background:transparent!important;box-shadow:none!important}body{-webkit-app-region:drag}button,a,input,select,textarea{ -webkit-app-region:no-drag }`
       : `body{-webkit-app-region:drag}button,a,input,select,textarea{ -webkit-app-region:no-drag }`;
     mainWindow.webContents.insertCSS(css);
-    applyAppearance(appearance);
+    applyAppearance(appearance, false);
   });
 }
 
 function openSettings() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
+  windowMode = "settings";
   mainWindow.setResizable(true);
-  mainWindow.setBounds({ ...mainWindow.getBounds(), width: 700, height: 760 });
+  setWindowBounds({ ...mainWindow.getBounds(), width: 700, height: 760 });
   mainWindow.loadURL(`http://127.0.0.1:${PORT}/settings`);
 }
 
 function openOverlay() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
+  windowMode = "overlay";
   mainWindow.setResizable(false);
-  mainWindow.setBounds({ ...mainWindow.getBounds(), width: Math.round(300 * appearance.scale), height: Math.round(600 * appearance.scale) });
+  setWindowBounds({ ...mainWindow.getBounds(), width: Math.round(300 * appearance.scale), height: Math.round(600 * appearance.scale) });
+  persistOverlayBoundsSoon();
   mainWindow.loadURL(`http://127.0.0.1:${PORT}/overlay${OBS_MODE ? "?obs=1" : ""}`);
   mainWindow.show();
 }
@@ -157,6 +212,7 @@ function createTray() {
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: "Show overlay", click: () => mainWindow?.show() },
     { label: "Open Settings", click: openSettings },
+    { label: "Reset Overlay Position", click: resetOverlayPosition },
     { label: "Launch at startup", type: "checkbox", checked: app.getLoginItemSettings().openAtLogin, click: (item) => app.setLoginItemSettings({ openAtLogin: item.checked }) },
     { label: "OBS chroma mode", type: "checkbox", checked: OBS_MODE, enabled: false },
     { type: "separator" },
@@ -178,13 +234,30 @@ ipcMain.handle("appearance:apply", (_event, next) => applyAppearance(next || app
 ipcMain.handle("window:overlay", () => { openOverlay(); return { ok: true }; });
 ipcMain.handle("updates:check", () => ({ ok: false, message: "Updates are not configured for this local build yet." }));
 ipcMain.handle("worker:run", (_event, worker) => {
-  const selected = worker === "youtube" ? "youtube" : "riot";
-  const child = spawnWorker(selected);
-  child.unref();
-  return { ok: true, message: `${selected === "youtube" ? "YouTube catalog" : "Riot match"} sync started in the background.` };
+  const selected = worker === "youtube" ? "youtube" : worker === "data" ? "data" : "riot";
+  const label = selected === "youtube" ? "YouTube catalog" : selected === "data" ? "Data Dragon" : "Riot match";
+  try {
+    const workerProcess = spawnWorker(selected);
+    return new Promise((resolve) => {
+      workerProcess.child.once("error", (error) => resolve({ ok: false, message: `${label} sync could not start: ${error.message}` }));
+      workerProcess.child.once(workerProcess.exitEvent, (code) => resolve(code === 0
+        ? { ok: true, message: `${label} sync completed.` }
+        : { ok: false, message: `${label} sync exited with code ${code ?? "unknown"}.` }));
+    });
+  } catch (error) {
+    return { ok: false, message: `${label} worker is unavailable: ${error instanceof Error ? error.message : String(error)}` };
+  }
 });
 
-app.whenReady().then(async () => {
+if (!hasSingleInstanceLock) app.quit();
+else app.on("second-instance", () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+});
+
+if (hasSingleInstanceLock) app.whenReady().then(async () => {
   const saved = readSettings();
   appearance = { opacity: saved.opacity, scale: saved.scale };
   initializeDataIfNeeded();
@@ -196,5 +269,10 @@ app.whenReady().then(async () => {
   app.setLoginItemSettings({ openAtLogin: saved.openAtLogin });
 });
 
-app.on("window-all-closed", (event) => event.preventDefault());
-app.on("will-quit", () => { globalShortcut.unregisterAll(); if (serverProcess) serverProcess.kill(); });
+app.on("window-all-closed", () => {});
+app.on("will-quit", () => {
+  if (windowMode === "overlay" && mainWindow && !mainWindow.isDestroyed()) writeSettings({ overlayBounds: mainWindow.getBounds() });
+  clearTimeout(boundsSaveTimer);
+  globalShortcut.unregisterAll();
+  if (serverProcess) serverProcess.kill();
+});

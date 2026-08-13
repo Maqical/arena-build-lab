@@ -49,22 +49,22 @@ function phaseLabel(snapshot: GameStateSnapshot | null): string {
   return labels[snapshot.phase];
 }
 
-function demoSnapshot(entities: OverlayCatalogEntity[], champions: Champion[], phase: "augment_select" | "champ_select" | "in_progress" = "augment_select"): GameStateSnapshot {
+function demoSnapshot(entities: OverlayCatalogEntity[], champions: Champion[], phase: "augment_select" | "champ_select" | "in_progress" | "disconnected" = "augment_select"): GameStateSnapshot {
   const offered = ["Goliath", "Tank Engine", "Mind to Matter"].map((name) => entities.find((entity) => entity.name === name)?.entityKey ?? "").filter(Boolean);
   const sion = champions.find((champion) => champion.key === "Sion");
   return {
     sequence: 1,
-    connection: { state: "connected", connected: true, lockfileSource: "demo", port: 0, attempt: 0, retryInMs: null, lastError: "", updatedAt: new Date().toISOString() },
+    connection: { state: phase === "disconnected" ? "retrying" : "connected", connected: phase !== "disconnected", lockfileSource: "demo", port: phase === "disconnected" ? null : 0, attempt: phase === "disconnected" ? 1 : 0, retryInMs: phase === "disconnected" ? 5_000 : null, lastError: phase === "disconnected" ? "League Client lockfile was not found." : "", updatedAt: new Date().toISOString() },
     phase,
     rawPhase: phase === "champ_select" ? "ChampSelect" : "InProgress",
     isArena: true,
     queueId: 1740,
     queueName: "Arena demo",
-    champion: { id: sion?.id ?? 14, name: "Sion", level: phase === "champ_select" ? 1 : 18 },
+    champion: { id: phase === "disconnected" ? null : sion?.id ?? 14, name: phase === "disconnected" ? "" : "Sion", level: phase === "champ_select" ? 1 : 18 },
     lobbyMembers: [],
-    currentEntityRefs: phase === "champ_select" ? [] : [entities.find((entity) => entity.name === "Overlord's Bloodmail")?.entityKey ?? ""].filter(Boolean),
+    currentEntityRefs: phase === "champ_select" || phase === "disconnected" ? [] : [entities.find((entity) => entity.name === "Overlord's Bloodmail")?.entityKey ?? ""].filter(Boolean),
     offeredAugmentRefs: phase === "augment_select" ? offered : [],
-    liveStats: phase === "champ_select" ? null : { currentHealth: 11_400, maxHealth: 16_300, attackDamage: 630, abilityPower: 0, attackSpeed: 0.91, armor: 171, magicResistance: 103, moveSpeed: 345, abilityHaste: 25 },
+    liveStats: phase === "champ_select" || phase === "disconnected" ? null : { currentHealth: 11_400, maxHealth: 16_300, attackDamage: 630, abilityPower: 0, attackSpeed: 0.91, armor: 171, magicResistance: 103, moveSpeed: 345, abilityHaste: 25 },
     offerFeed: phase === "champ_select"
       ? { status: "waiting", sourceUri: "", detectedAt: "", note: "Champion Select demo.", observedCandidateUris: [] }
       : phase === "augment_select"
@@ -124,9 +124,9 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
 
   useEffect(() => {
     const demo = new URLSearchParams(window.location.search).get("demo");
-    if (demo === "1" || demo === "champ-select" || demo === "screenshot") {
+    if (demo === "1" || demo === "champ-select" || demo === "screenshot" || demo === "disconnected") {
       const timer = window.setTimeout(() => {
-        setSnapshot(demoSnapshot(entities, champions, demo === "champ-select" ? "champ_select" : demo === "screenshot" ? "in_progress" : "augment_select"));
+        setSnapshot(demoSnapshot(entities, champions, demo === "champ-select" ? "champ_select" : demo === "screenshot" ? "in_progress" : demo === "disconnected" ? "disconnected" : "augment_select"));
         setConnectionState("live");
       }, 0);
       return () => window.clearTimeout(timer);
@@ -183,17 +183,19 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
 
       {welcome && <section className="overlay-welcome"><strong>Fetching latest Arena data…</strong><p>This only happens once. The overlay will switch to normal mode when initialization finishes.</p></section>}
 
+      {snapshot?.phase === "disconnected" && <section className="overlay-connection-wait"><span className="overlay-wait-pulse" /><div><strong>Waiting for League Client…</strong><p>The overlay checks for League every five seconds and reconnects automatically.</p></div></section>}
+
       {!visible && <p className="overlay-hidden-note">Overlay details hidden <button type="button" onClick={() => setVisible(true)}>Show</button></p>}
 
       {visible && <>
 
-      <section className="overlay-champion">
+      {snapshot?.phase !== "disconnected" && <section className="overlay-champion">
         {champion ? <Image src={champion.iconUrl} alt="" width={42} height={42} unoptimized /> : <div className="overlay-champion-placeholder">?</div>}
         <div><span>Level {snapshot?.champion.level ?? 1}</span><h1>{champion?.name || snapshot?.champion.name || "No champion"}</h1></div>
         {championMeta && <a href={championMeta.sourceUrl} target="_blank" rel="noreferrer"><strong>{championMetaPercent?.toFixed(1)}%</strong><span>{championMeta.sourceName === "riot_api_local" ? `Local WR · ${championMeta.sampleSize ?? 0} games` : `Meta WR · ${championMeta.tier}`}</span></a>}
-      </section>
+      </section>}
 
-      {snapshot?.phase === "arena_lobby" ? <LobbyScanner snapshot={snapshot} /> : snapshot?.phase === "champ_select" ? <ChampSelectAssistant champions={champions} snapshot={snapshot} compact /> : snapshot?.phase === "in_progress" ? <>
+      {snapshot?.phase === "disconnected" ? null : snapshot?.phase === "arena_lobby" ? <LobbyScanner snapshot={snapshot} /> : snapshot?.phase === "champ_select" ? <ChampSelectAssistant champions={champions} snapshot={snapshot} compact /> : snapshot?.phase === "in_progress" ? <>
         <LiveGameHUD snapshot={snapshot} build={liveBuild} augments={currentEntities.filter((entity) => entity.kind === "augment")} />
         <ItemAssistant snapshot={snapshot} />
         {recommendation?.screenshotExtracted && <section className="overlay-offers"><div className="overlay-section-title"><span>Screenshot offers</span><b>Ranked</b></div><div className="overlay-verdict"><span>AI pick</span><strong>{recommendation.recommendation.name}</strong><p>{recommendation.recommendation.rationale}</p></div></section>}
@@ -224,14 +226,14 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
         </section>
       )}
 
-      {visible && snapshot?.phase !== "post_game" && <ScreenshotPickerControl
+      {visible && snapshot?.phase !== "disconnected" && snapshot?.phase !== "post_game" && <ScreenshotPickerControl
         championId={champion?.id ?? snapshot?.champion.id}
         level={snapshot?.champion.level ?? 18}
         currentEntityKeys={currentEntities.map((entity) => entity.entityKey)}
         onResult={(result) => { setRecommendation(result); setError(""); }}
       />}
 
-      {visible && snapshot?.phase !== "in_progress" && snapshot?.phase !== "post_game" && <section className="overlay-hud">
+      {visible && snapshot?.phase !== "disconnected" && snapshot?.phase !== "in_progress" && snapshot?.phase !== "post_game" && <section className="overlay-hud">
         <div className="overlay-section-title"><span>Live stat tracker</span><b>{live ? "Live + theory" : "Theoretical"}</b></div>
         <div className="overlay-stat-grid">
           <div><span>Max HP</span><strong>{display(theory?.maxHealth)}</strong>{live && <small>game {display(live.maxHealth)}</small>}</div>

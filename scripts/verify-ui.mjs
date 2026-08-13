@@ -175,6 +175,12 @@ try {
   assert.equal(await champOverlayPage.getByRole("button", { name: /Paste augment snip/ }).count(), 1);
   await champOverlayPage.screenshot({ path: path.join(output, "champ-select-overlay.png"), fullPage: true });
 
+  const disconnectedPage = await browser.newPage({ viewport: { width: 300, height: 600 }, deviceScaleFactor: 1 });
+  disconnectedPage.on("pageerror", (error) => errors.push(error.message));
+  await disconnectedPage.goto("http://localhost:3000/overlay?demo=disconnected", { waitUntil: "domcontentloaded" });
+  await disconnectedPage.getByText("Waiting for League Client…", { exact: true }).waitFor();
+  assert.equal(await disconnectedPage.locator(".overlay-connection-wait").count(), 1);
+
   const hotkeyPage = await browser.newPage({ viewport: { width: 300, height: 600 }, deviceScaleFactor: 1 });
   await hotkeyPage.addInitScript(() => {
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { read: async () => [{ types: ["image/png"], getType: async () => new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" }) }] } });

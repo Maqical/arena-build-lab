@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { DRAFT_STATS, type DraftStatKey } from "@/engine/draft-picker";
 import type { AIPickerRequest, AIPickerResponse } from "@/lib/ai-picker-types";
@@ -141,7 +142,7 @@ export function AIPicker({ champions, entities }: { champions: Champion[]; entit
           <div className="screenshot-row"><label><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => void attachScreenshot(event.target.files?.[0])} /><span>{screenshotName || "Attach draft screenshot"}</span></label>{screenshotName && <button type="button" onClick={() => { setScreenshotDataUrl(""); setScreenshotName(""); }}>Clear</button>}</div>
           <p className="picker-help">Manual options recalculate locally after 300 ms. A screenshot is sent to OpenAI only when you press Ask AI and manual options are incomplete.</p>
           <button className="picker-submit" disabled={loading} type="submit">{loading ? "Analyzing draft…" : "Ask AI for the pick"}</button>
-          {error && <p className="picker-error">{error}</p>}
+          {error && <p className="picker-error">{error}{/settings|api key/i.test(error) && <> <Link href="/settings">Open Settings</Link></>}</p>}
         </div>
       </section>
 
