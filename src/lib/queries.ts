@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getDatabase, jsonArray } from "@/lib/db";
+import { normalizedSelectionKey, selectionNumericId, uncataloguedSelectionLabel } from "@/lib/selection-label";
 import type { CatalogEntity, Champion, Combo, EntityKind, EntityOption, StatFormula, StatKey, Video } from "@/lib/types";
 
 type EntityRow = Record<string, unknown>;
@@ -169,6 +170,37 @@ export function getEntityOptions(): EntityOption[] {
     iconUrl: String(row.icon_url),
     rarity: String(row.rarity),
   }));
+}
+
+export type ResolvedSelectionOption = EntityOption & { numericId: number | null; catalogued: boolean };
+
+export function resolveSelectionOptions(references: readonly string[]): ResolvedSelectionOption[] {
+  const select = getDatabase().prepare(`
+    SELECT entity_key, numeric_id, name, kind, icon_url, rarity
+    FROM entities WHERE entity_key = ? AND kind = 'augment'
+  `);
+  return references.map((reference) => {
+    const entityKey = normalizedSelectionKey(reference);
+    const row = select.get(entityKey) as EntityRow | undefined;
+    if (row) return {
+      entityKey: String(row.entity_key),
+      numericId: Number(row.numeric_id),
+      name: String(row.name),
+      kind: "augment",
+      iconUrl: String(row.icon_url ?? ""),
+      rarity: String(row.rarity ?? ""),
+      catalogued: true,
+    };
+    return {
+      entityKey,
+      numericId: selectionNumericId(reference),
+      name: uncataloguedSelectionLabel(reference),
+      kind: "augment",
+      iconUrl: "",
+      rarity: "uncatalogued",
+      catalogued: false,
+    };
+  });
 }
 
 export function searchCatalog(options: { kind: EntityKind; query?: string; tag?: string; limit?: number }): CatalogEntity[] {

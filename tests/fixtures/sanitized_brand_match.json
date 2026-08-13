@@ -1,0 +1,79 @@
+{
+  "metadata": {
+    "dataVersion": "2",
+    "matchId": "TEST_SANITIZED_BRAND_001",
+    "participants": [
+      "sanitized-puuid-brand",
+      "sanitized-puuid-opponent"
+    ]
+  },
+  "info": {
+    "gameCreation": 1786585200000,
+    "gameStartTimestamp": 1786585260000,
+    "gameDuration": 1942,
+    "gameEndTimestamp": 1786587202000,
+    "gameId": 1000000001,
+    "gameMode": "CHERRY",
+    "gameName": "sanitized-arena-fixture",
+    "gameType": "MATCHED_GAME",
+    "gameVersion": "16.16.700.1234",
+    "mapId": 30,
+    "queueId": 1740,
+    "participants": [
+      {
+        "participantId": 1,
+        "puuid": "sanitized-puuid-brand",
+        "riotIdGameName": "Fixture Player One",
+        "riotIdTagline": "TEST",
+        "championId": 63,
+        "championName": "Brand",
+        "placement": 1,
+        "playerSubteamId": 1,
+        "win": true,
+        "playerAugment1": 1,
+        "playerAugment2": 66,
+        "playerAugment3": 301,
+        "playerAugment4": 379,
+        "playerAugment5": 308,
+        "item0": 223158,
+        "item1": 447108,
+        "item2": 447106,
+        "item3": 443055,
+        "item4": 443081,
+        "item5": 447119,
+        "item6": 3348,
+        "champLevel": 18,
+        "kills": 32,
+        "deaths": 6,
+        "assists": 19,
+        "goldEarned": 32750,
+        "goldSpent": 31100,
+        "totalDamageDealtToChampions": 227222,
+        "totalDamageTaken": 141203,
+        "damageSelfMitigated": 282503,
+        "totalHeal": 30544,
+        "largestCriticalStrike": 0
+      },
+      {
+        "participantId": 2,
+        "puuid": "sanitized-puuid-opponent",
+        "riotIdGameName": "Fixture Player Two",
+        "riotIdTagline": "TEST",
+        "championId": 103,
+        "championName": "Ahri",
+        "placement": 2,
+        "playerSubteamId": 2,
+        "win": false,
+        "playerAugment1": 137000,
+        "playerAugment2": 137101,
+        "item0": 3089,
+        "item1": 3118,
+        "item2": 0,
+        "champLevel": 18,
+        "kills": 14,
+        "deaths": 9,
+        "assists": 11
+      }
+    ]
+  }
+}

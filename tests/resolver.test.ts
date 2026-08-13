@@ -55,6 +55,21 @@ test("resolves champion and augment IDs through a caller-provided pure catalog",
   assert.equal(result.stats.abilityHaste, 25);
 });
 
+test("ignores uncatalogued selections and emits a diagnostic without inventing an effect", () => {
+  const diagnostics: string[] = [];
+  const result = resolveArenaBuild({
+    championId: "Test",
+    level: 1,
+    augmentIds: ["379"],
+    catalog: { champions: [champion], effects: [] },
+    options: { onDiagnostic: (message) => diagnostics.push(message) },
+  });
+  assert.deepEqual(diagnostics, ["Ignored uncatalogued selection ID: 379"]);
+  assert.deepEqual(result.effects, []);
+  assert(result.warnings.includes("Ignored uncatalogued selection ID: 379"));
+  assert.equal(result.status, "converged");
+});
+
 test("solves a contracting recursive HP to AD to AP to HP graph", () => {
   const effects = [
     effect("HP to AD", { rules: [{ source: "maxHealth", target: "bonusAttackDamage", coefficient: 0.03 }] }),

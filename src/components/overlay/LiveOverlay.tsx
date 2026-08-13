@@ -50,7 +50,7 @@ function phaseLabel(snapshot: GameStateSnapshot | null): string {
   return labels[snapshot.phase];
 }
 
-function demoSnapshot(entities: OverlayCatalogEntity[], champions: Champion[], phase: "augment_select" | "champ_select" | "in_progress" | "disconnected" = "augment_select"): GameStateSnapshot {
+function demoSnapshot(entities: OverlayCatalogEntity[], champions: Champion[], phase: "augment_select" | "champ_select" | "in_progress" | "disconnected" = "augment_select", includeUncatalogued = false): GameStateSnapshot {
   const offered = ["Goliath", "Tank Engine", "Mind to Matter"].map((name) => entities.find((entity) => entity.name === name)?.entityKey ?? "").filter(Boolean);
   const sion = champions.find((champion) => champion.key === "Sion");
   return {
@@ -65,7 +65,7 @@ function demoSnapshot(entities: OverlayCatalogEntity[], champions: Champion[], p
     queueName: "Arena demo",
     champion: { id: phase === "disconnected" ? null : sion?.id ?? 14, name: phase === "disconnected" ? "" : "Sion", level: phase === "champ_select" ? 1 : 18 },
     lobbyMembers: [],
-    currentEntityRefs: phase === "champ_select" || phase === "disconnected" ? [] : [entities.find((entity) => entity.name === "Overlord's Bloodmail")?.entityKey ?? ""].filter(Boolean),
+    currentEntityRefs: phase === "champ_select" || phase === "disconnected" ? [] : [entities.find((entity) => entity.name === "Overlord's Bloodmail")?.entityKey ?? "", ...(includeUncatalogued ? ["augment:379"] : [])].filter(Boolean),
     offeredAugmentRefs: phase === "augment_select" ? offered : [],
     liveStats: phase === "champ_select" || phase === "disconnected" ? null : { currentHealth: 11_400, maxHealth: 16_300, attackDamage: 630, abilityPower: 0, attackSpeed: 0.91, armor: 171, magicResistance: 103, moveSpeed: 345, abilityHaste: 25 },
     offerFeed: phase === "champ_select"
@@ -140,9 +140,9 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
 
   useEffect(() => {
     const demo = new URLSearchParams(window.location.search).get("demo");
-    if (demo === "1" || demo === "champ-select" || demo === "screenshot" || demo === "disconnected") {
+    if (demo === "1" || demo === "champ-select" || demo === "screenshot" || demo === "disconnected" || demo === "uncatalogued") {
       const timer = window.setTimeout(() => {
-        setSnapshot(demoSnapshot(entities, champions, demo === "champ-select" ? "champ_select" : demo === "screenshot" ? "in_progress" : demo === "disconnected" ? "disconnected" : "augment_select"));
+        setSnapshot(demoSnapshot(entities, champions, demo === "champ-select" ? "champ_select" : demo === "screenshot" || demo === "uncatalogued" ? "in_progress" : demo === "disconnected" ? "disconnected" : "augment_select", demo === "uncatalogued"));
         setConnectionState("live");
       }, 0);
       return () => window.clearTimeout(timer);

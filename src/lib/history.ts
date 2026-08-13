@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getDatabase, jsonArray } from "@/lib/db";
+import { resolveSelectionOptions } from "@/lib/queries";
 
 type Row = Record<string, unknown>;
 
@@ -15,7 +16,7 @@ export type MatchHistoryEntry = {
   championIconUrl: string;
   placement: number | null;
   augmentKeys: string[];
-  augments: Array<{ key: string; name: string; iconUrl: string; rarity: string }>;
+  augments: Array<{ key: string; numericId: number | null; name: string; iconUrl: string; rarity: string; catalogued: boolean }>;
   items: Array<{ key: string; name: string; iconUrl: string }>;
   kills: number | null;
   deaths: number | null;
@@ -37,12 +38,15 @@ function selectedPuuid(): string {
   return String(row?.puuid ?? "");
 }
 
-function mapAugments(db: ReturnType<typeof getDatabase>, ids: string[]): MatchHistoryEntry["augments"] {
-  const select = db.prepare("SELECT entity_key, name, icon_url, rarity FROM entities WHERE entity_key = ?");
-  return ids.flatMap((key) => {
-    const row = select.get(key) as Row | undefined;
-    return row ? [{ key: String(row.entity_key), name: String(row.name), iconUrl: String(row.icon_url), rarity: String(row.rarity) }] : [];
-  });
+function mapAugments(ids: string[]): MatchHistoryEntry["augments"] {
+  return resolveSelectionOptions(ids).map((selection) => ({
+    key: selection.entityKey,
+    numericId: selection.numericId,
+    name: selection.name,
+    iconUrl: selection.iconUrl,
+    rarity: selection.rarity,
+    catalogued: selection.catalogued,
+  }));
 }
 
 function mapItems(db: ReturnType<typeof getDatabase>, ids: string[]): MatchHistoryEntry["items"] {
@@ -92,7 +96,7 @@ export function getMatchHistory(limit = 100, includeAllPlayers = false): MatchHi
       championIconUrl: String(row.champion_icon_url ?? ""),
       placement: row.placement == null ? null : Number(row.placement),
       augmentKeys,
-      augments: mapAugments(db, augmentKeys),
+      augments: mapAugments(augmentKeys),
       items: mapItems(db, itemKeys),
       kills: finite("kills"),
       deaths: finite("deaths"),
@@ -139,7 +143,7 @@ export function getTrophies(limit = 10): Trophy[] {
     return [{
       id: Number(row.id), championId: row.champion_id == null ? null : Number(row.champion_id),
       championName: String(row.champion_name || "Unknown champion"), championIconUrl: String(row.champion_icon_url ?? ""),
-      augmentKeys, augments: mapAugments(db, augmentKeys), stat, value, endedAt: String(row.ended_at),
+      augmentKeys, augments: mapAugments(augmentKeys), stat, value, endedAt: String(row.ended_at),
     }];
   });
 }

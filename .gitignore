@@ -18,6 +18,7 @@ logs/lcu_dump*.json
 .env*
 !.env.example
 tests/fixtures/*.local.json
+scripts/local/
 qa/
 __pycache__/
 *.py[cod]

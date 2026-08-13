@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getDatabase, jsonArray } from "@/lib/db";
+import { uncataloguedSelectionLabel } from "@/lib/selection-label";
 
 type Row = Record<string, unknown>;
 export type PostGameAnalysisResult = { championName: string; peakHp: number; peakAd: number; peakAp: number; personalRecord: boolean; picked: string[]; suggested: Array<{ name: string; firstPlaceRate: number; sampleSize: number }> };
@@ -12,7 +13,7 @@ export function getPostGameAnalysis(championName = ""): PostGameAnalysisResult |
   const championId = Number(observation.champion_id ?? 0);
   const picked = jsonArray(observation.augment_ids_json);
   const names = db.prepare("SELECT name FROM entities WHERE entity_key=?");
-  const pickedNames = picked.map((key) => String((names.get(key) as Row | undefined)?.name ?? key));
+  const pickedNames = picked.map((key) => String((names.get(key) as Row | undefined)?.name ?? uncataloguedSelectionLabel(key)));
   const suggestions = db.prepare(`
     SELECT m.entity_key, m.value, m.sample_size, e.name
     FROM meta_snapshots m LEFT JOIN entities e

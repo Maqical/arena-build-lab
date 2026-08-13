@@ -1,6 +1,6 @@
 {
   "name": "arena-build-lab",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "main": "electron/main.cjs",
   "description": "Local-first League of Legends Arena and ARAM: Mayhem companion overlay",
@@ -15,6 +15,7 @@
     "lint": "eslint .",
     "test": "tsx --test tests/*.test.ts",
     "test:ui": "node scripts/verify-ui.mjs",
+    "test:uncatalogued": "tsx tests/uncatalogued.spec.ts",
     "stress:crawl": "tsx scripts/stress_test_crawler.ts",
     "stress:resolver": "tsx scripts/stress_test_resolver.ts",
     "stress:ui": "tsx tests/ui_stress.spec.ts",
@@ -77,7 +78,7 @@
       { "from": "build-workers/data-sync.cjs", "to": "workers/data-sync.cjs" }
     ],
     "win": { "icon": "assets/arena-build-lab-v2.ico", "target": [{ "target": "nsis", "arch": ["x64"] }] },
-    "nsis": { "oneClick": false, "perMachine": false, "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true, "createStartMenuShortcut": true }
+    "nsis": { "oneClick": false, "perMachine": false, "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true, "createStartMenuShortcut": true, "deleteAppDataOnUninstall": false }
   },
   "overrides": {
     "esbuild": "0.28.1"

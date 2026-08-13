@@ -35,6 +35,9 @@ export function resolveLiveBuild(request: LiveResolveRequest): LiveResolveRespon
     const entity = loadResolverEntity(db, key);
     if (!entity) {
       ignoredEntityKeys.push(key);
+      if (/^(?:augment|card):?\d+$/i.test(key) || /^\d+$/.test(key)) {
+        console.warn(`Ignored uncatalogued selection ID: ${key.replace(/^(?:augment|card):/i, "")}`);
+      }
       continue;
     }
     effects.push(entity.effect);

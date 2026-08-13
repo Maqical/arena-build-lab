@@ -94,6 +94,7 @@ export type ResolveOptions = {
   epsilon?: number;
   maxIterations?: number;
   scenario?: ResolverScenario;
+  onDiagnostic?: (message: string) => void;
 };
 
 export type ResolveStatus = "converged" | "diverged" | "unbounded" | "max_iterations";
@@ -354,12 +355,32 @@ export function resolveArenaBuild(request: ResolverIdRequest): ResolverResult {
   );
   if (!champion) throw new Error(`Unknown champion ID: ${request.championId}`);
 
-  const requestedIds = [...request.augmentIds, ...(request.itemIds ?? [])];
-  const effectsById = new Map(request.catalog.effects.map((effect) => [effect.key.toLowerCase(), effect]));
-  const effects = requestedIds.map((id) => {
-    const effect = effectsById.get(id.toLowerCase());
-    if (!effect) throw new Error(`Unknown Arena effect ID: ${id}`);
-    return effect;
-  });
-  return resolveArenaStats(champion, request.level, effects, request.options);
+  const effectsById = new Map<string, ResolverEffect>();
+  for (const effect of request.catalog.effects) {
+    const key = effect.key.toLowerCase();
+    effectsById.set(key, effect);
+    const numeric = key.match(/^(?:augment|item):(\d+)$/)?.[1];
+    if (numeric) effectsById.set(numeric, effect);
+  }
+  const effects: ResolverEffect[] = [];
+  const diagnostics: string[] = [];
+  const diagnostic = request.options?.onDiagnostic ?? ((message: string) => console.warn(message));
+  for (const id of request.augmentIds) {
+    const normalized = String(id).toLowerCase();
+    const effect = effectsById.get(normalized) ?? effectsById.get(`augment:${normalized}`);
+    if (effect) effects.push(effect);
+    else {
+      const message = `Ignored uncatalogued selection ID: ${String(id).replace(/^augment:/i, "")}`;
+      diagnostics.push(message);
+      diagnostic(message);
+    }
+  }
+  for (const id of request.itemIds ?? []) {
+    const normalized = String(id).toLowerCase();
+    const effect = effectsById.get(normalized) ?? effectsById.get(`item:${normalized}`);
+    if (!effect) throw new Error(`Unknown Arena item ID: ${id}`);
+    effects.push(effect);
+  }
+  const result = resolveArenaStats(champion, request.level, effects, request.options);
+  return diagnostics.length === 0 ? result : { ...result, warnings: [...diagnostics, ...result.warnings] };
 }

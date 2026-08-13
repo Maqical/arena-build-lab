@@ -3,6 +3,7 @@
 import Image from "next/image";
 import type { GameStateSnapshot } from "@/lib/lcu/GameStateMonitor";
 import type { LiveResolveResponse, OverlayCatalogEntity } from "@/lib/live-overlay-types";
+import { uncataloguedSelectionLabel } from "@/lib/selection-label";
 
 function number(value: number | undefined | null, digits = 0): string {
   if (value == null || !Number.isFinite(value)) return "—";
@@ -36,7 +37,7 @@ export function LiveGameHUD({ snapshot, build, augments, items, unresolvedAugmen
     <div className="overlay-section-title"><span>Chosen {snapshot.mode === "aram_mayhem" ? "cards" : "augments"}</span><b>{augments.length + unresolvedAugmentRefs.length}</b></div>
     {augments.length + unresolvedAugmentRefs.length > 0 ? <div className="live-augment-list">
       {augments.map((augment) => <div key={augment.entityKey}><Image src={augment.iconUrl} width={32} height={32} alt="" unoptimized /><span>{augment.name}</span></div>)}
-      {unresolvedAugmentRefs.map((reference) => <div key={reference}><span className="live-augment-unknown">?</span><span>{reference.replace(/^augment:/i, "Card ")}</span></div>)}
+      {unresolvedAugmentRefs.map((reference) => <div className="uncatalogued" key={reference}><span className="live-augment-unknown">?</span><span>{uncataloguedSelectionLabel(reference)}</span></div>)}
     </div> : <p className="overlay-muted">No selected {snapshot.mode === "aram_mayhem" ? "Mayhem card" : "augment"} IDs are exposed yet. Rune, perk, card, KIWI, and augment-granted spell events are monitored automatically; Ctrl+Shift+A remains available for offer capture.</p>}
   </section>;
 }

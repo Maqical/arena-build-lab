@@ -113,6 +113,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .history-placement.place-1 { background: rgba(241,198,94,.13); color: #ffe08a; }
 .history-icon-row, .history-item-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
 .history-icon-row span { position: relative; display: flex; align-items: center; gap: 5px; max-width: 135px; padding: 3px 6px 3px 3px; border: 1px solid rgba(102,210,255,.13); border-radius: 6px; background: rgba(52,147,187,.07); }
+.history-icon-row span.uncatalogued { max-width: 210px; border-style: dashed; border-color: rgba(244,201,107,.32); background: rgba(244,201,107,.07); }
+.history-icon-row span.uncatalogued > b { display: grid; width: 25px; height: 25px; flex: 0 0 auto; place-items: center; border-radius: 5px; color: #f4c96b; background: rgba(244,201,107,.1); font-size: 13px; }
 .history-icon-row img, .history-item-row img { border-radius: 5px; }
 .history-icon-row em { overflow: hidden; color: #aebbc5; font-size: 8px; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
 .history-icon-row i { color: #758695; font-size: 9px; font-style: normal; }

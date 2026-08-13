@@ -1,4 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
+import { uncataloguedSelectionLabel } from "@/lib/selection-label";
 
 type Row = Record<string, unknown>;
 
@@ -105,7 +106,7 @@ export function queryBuildsForAugments(db: DatabaseSync, championId: number, req
     championId,
     championName: String(champion?.name ?? championId),
     augmentIds,
-    augmentNames: augmentIds.map((id) => augmentNameById.get(id) ?? `Augment ${id}`),
+    augmentNames: augmentIds.map((id) => augmentNameById.get(id) ?? uncataloguedSelectionLabel(id)),
     sampleSize,
     lowSample: false,
     source: "observed",
@@ -146,7 +147,7 @@ export function queryBuildsForAugments(db: DatabaseSync, championId: number, req
     championId,
     championName,
     augmentIds,
-    augmentNames: augmentIds.map((id) => augmentNameById.get(id) ?? `Augment ${id}`),
+    augmentNames: augmentIds.map((id) => augmentNameById.get(id) ?? uncataloguedSelectionLabel(id)),
     sampleSize,
     lowSample: true,
     source: fallbackItems.length > 0 ? "extreme" : "none",
