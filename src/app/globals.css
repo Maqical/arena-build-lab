@@ -491,6 +491,11 @@ footer { color: #5f5868; font-size: 10px; text-align: center; margin-top: 42px; 
 .live-augment-list > div, .live-item-list > div, .item-buy-list > div { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px; background: #100d17; border-radius: 6px; }
 .live-augment-list span, .live-item-list span, .item-buy-list strong { overflow-wrap: anywhere; white-space: normal; color: #e4dce9; font-size: 16px; line-height: 1.5; }
 .live-augment-list .live-augment-unknown { display: grid; flex: 0 0 28px; width: 28px; height: 28px; place-items: center; border: 1px solid rgba(106,216,255,.42); border-radius: 6px; color: #6ad8ff; font: 700 13px var(--font-geist-mono), monospace; }
+.screenshot-confirm > button { display: grid; grid-template-columns: 28px minmax(0,1fr) auto; align-items: center; gap: 8px; width: 100%; margin: 6px 0; padding: 8px; border: 1px solid rgba(106,216,255,.22); border-radius: 8px; background: #100d17; color: #f3edf6; text-align: left; }
+.screenshot-confirm > button > span { display: grid; width: 26px; height: 26px; place-items: center; border-radius: 6px; background: rgba(106,216,255,.13); color: #6ad8ff; font-weight: 800; }
+.screenshot-confirm > button > strong { min-width: 0; overflow-wrap: anywhere; font-size: 16px; line-height: 1.35; }
+.screenshot-confirm > button > small { color: #b8acbe; }
+.screenshot-confirm > button.confirmed { border-color: #5ee6a8; background: rgba(42,121,87,.22); }
 .item-buy-list { display: grid; gap: 5px; }
 .item-buy-list > div { padding: 6px; }
 .item-buy-list span { min-width: 0; flex: 1; }

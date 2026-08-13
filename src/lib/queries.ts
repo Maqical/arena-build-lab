@@ -120,7 +120,7 @@ export function getStatFormulas(): StatFormula[] {
   const select = db.prepare(`
     SELECT entity_key, name, icon_url, patch, source_url, raw_json
     FROM entities WHERE kind = ? AND lower(name) = lower(?)
-    ORDER BY purchasable DESC, numeric_id DESC LIMIT 1
+    ORDER BY purchasable DESC, CASE WHEN kind = 'augment' AND numeric_id < 1000 THEN 0 ELSE 1 END, numeric_id DESC LIMIT 1
   `);
   return FORMULA_SPECS.flatMap((spec) => {
     const row = select.get(spec.kind, spec.name) as EntityRow | undefined;

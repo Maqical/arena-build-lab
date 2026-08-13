@@ -30,7 +30,7 @@ try {
 
   await page.goto("http://localhost:3000/settings", { waitUntil: "domcontentloaded" });
   await page.getByRole("heading", { name: "Settings", exact: true }).waitFor();
-  await page.getByText("v1.0.1", { exact: true }).waitFor();
+  await page.getByText("v1.0.2", { exact: true }).waitFor();
   await page.screenshot({ path: path.join(output, "settings.png"), fullPage: true });
 
   await page.goto("http://localhost:3000/build-lab", { waitUntil: "domcontentloaded" });
@@ -54,10 +54,10 @@ try {
   await page.locator("#champion").selectOption("");
   await page.getByRole("button", { name: "Any ceiling", exact: true }).click();
   await page.locator("#search").fill("Mind to Matter");
-  await page.getByRole("heading", { name: "Mind to Matter", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Mind to Matter", exact: true }).first().waitFor();
   const augmentSearchResults = await page.locator(".entity-card").count();
-  assert.equal(augmentSearchResults, 1);
-  await page.getByRole("button", { name: "Find matching build paths", exact: false }).click();
+  assert(augmentSearchResults >= 1);
+  await page.getByRole("button", { name: "Find matching build paths", exact: false }).first().click();
   await page.getByText("Mana-to-Meat Conversion", { exact: true }).waitFor();
 
   const csvResponse = await page.request.get("http://localhost:3000/api/export?kind=augment");
@@ -215,6 +215,10 @@ try {
   await hotkeyPage.keyboard.press("Control+Shift+A");
   await hotkeyPage.getByText("Screenshot offers", { exact: true }).waitFor();
   await hotkeyPage.getByText("Best screenshot-derived health conversion", { exact: false }).waitFor();
+  assert.equal(await hotkeyPage.locator(".screenshot-confirm > button").count(), 3);
+  await hotkeyPage.keyboard.press("2");
+  await hotkeyPage.locator(".screenshot-confirm > button.confirmed", { hasText: "Tank Engine" }).waitFor();
+  await hotkeyPage.locator(".live-augment-list", { hasText: "Tank Engine" }).waitFor();
   await hotkeyPage.screenshot({ path: path.join(output, "screenshot-hotkey-overlay.png"), fullPage: true });
 
   assert.deepEqual(errors, []);

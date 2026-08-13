@@ -12,6 +12,7 @@ export type AIPickerScenario = {
 export type AIPickerRequest = {
   championId: number | string;
   level: number;
+  mode?: "arena" | "aram_mayhem";
   currentEntityKeys: string[];
   offeredAugmentKeys?: string[];
   opponent?: string;

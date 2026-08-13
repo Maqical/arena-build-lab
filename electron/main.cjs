@@ -164,14 +164,14 @@ function waitForServer() {
 
 async function capturePicker() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
-  const display = screen.getPrimaryDisplay();
+  const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
   const sources = await desktopCapturer.getSources({ types: ["screen"], thumbnailSize: display.size });
-  const source = sources[0];
+  const source = sources.find((candidate) => String(candidate.display_id) === String(display.id)) || sources[0];
   if (!source || source.thumbnail.isEmpty()) return;
   clipboard.writeImage(source.thumbnail);
   mainWindow.show();
   mainWindow.focus();
-  mainWindow.webContents.executeJavaScript(`(() => { const button = [...document.querySelectorAll("button")].find((candidate) => /Paste augment snip/i.test(candidate.textContent || "")); if (button) button.click(); })()`);
+  mainWindow.webContents.executeJavaScript(`(() => { const button = [...document.querySelectorAll("button")].find((candidate) => /Paste (?:augment|Mayhem card) snip/i.test(candidate.textContent || "")); if (button) button.click(); })()`);
 }
 
 function createWindow() {

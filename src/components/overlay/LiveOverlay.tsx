@@ -65,7 +65,7 @@ function demoSnapshot(entities: OverlayCatalogEntity[], champions: Champion[], p
     queueName: "Arena demo",
     champion: { id: phase === "disconnected" ? null : sion?.id ?? 14, name: phase === "disconnected" ? "" : "Sion", level: phase === "champ_select" ? 1 : 18 },
     lobbyMembers: [],
-    currentEntityRefs: phase === "champ_select" || phase === "disconnected" ? [] : [entities.find((entity) => entity.name === "Overlord's Bloodmail")?.entityKey ?? "", ...(includeUncatalogued ? ["augment:379"] : [])].filter(Boolean),
+    currentEntityRefs: phase === "champ_select" || phase === "disconnected" ? [] : [entities.find((entity) => entity.name === "Overlord's Bloodmail")?.entityKey ?? "", ...(includeUncatalogued ? ["augment:999999"] : [])].filter(Boolean),
     offeredAugmentRefs: phase === "augment_select" ? offered : [],
     liveStats: phase === "champ_select" || phase === "disconnected" ? null : { currentHealth: 11_400, maxHealth: 16_300, attackDamage: 630, abilityPower: 0, attackSpeed: 0.91, armor: 171, magicResistance: 103, moveSpeed: 345, abilityHaste: 25 },
     offerFeed: phase === "champ_select"
@@ -130,6 +130,10 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
   );
   const championMeta = champion ? metaLookup.get(`champion:${champion.key}`) : undefined;
   const championMetaPercent = championMeta?.winRate == null ? null : championMeta.sourceName === "riot_api_local" ? championMeta.winRate * 100 : championMeta.winRate;
+  const confirmScannedPick = (entityKey: string) => {
+    setScannedAugmentKeys((current) => [...new Set([...current, entityKey])]);
+    setError("");
+  };
   const displayedOffers = useMemo(() => {
     if (offered.length > 0) return offered;
     if (!recommendation?.screenshotExtracted) return [];
@@ -181,6 +185,7 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
     void postJson<AIPickerResponse>("/api/ai-picker", {
       championId: champion.id,
       level: snapshot.champion.level,
+      mode: snapshot.mode ?? "arena",
       currentEntityKeys: currentKeys,
       offeredAugmentKeys: offeredKeys,
       opponent: snapshot.mode === "aram_mayhem" ? "current ARAM: Mayhem lobby" : "current Arena lobby",
@@ -188,6 +193,20 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
     }).then((result) => { setRecommendation(result); setError(""); })
       .catch((caught) => setError(caught instanceof Error ? caught.message : String(caught)));
   }, [champion, currentEntities, offered, snapshot]);
+
+  useEffect(() => {
+    if (!recommendation?.screenshotExtracted) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.altKey || event.metaKey || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+      const option = recommendation.options[Number(event.key) - 1];
+      if (!option) return;
+      event.preventDefault();
+      setScannedAugmentKeys((current) => [...new Set([...current, option.entity.entityKey])]);
+      setError("");
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [recommendation]);
 
   const theory = liveBuild?.build.stats;
   const live = snapshot?.liveStats;
@@ -215,7 +234,7 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
       {snapshot?.phase === "disconnected" ? null : !snapshot?.supportsAugments ? <section className="overlay-idle-state"><span className="overlay-wait-pulse" /><strong>Waiting for Arena or ARAM: Mayhem…</strong><p>Open a supported queue and this companion will switch views automatically.</p></section> : snapshot?.phase === "arena_lobby" ? <LobbyScanner snapshot={snapshot} /> : snapshot?.phase === "champ_select" ? <ChampSelectAssistant champions={champions} snapshot={snapshot} compact /> : snapshot?.phase === "in_progress" ? <>
         <LiveGameHUD snapshot={snapshot} build={liveBuild} augments={currentEntities.filter((entity) => entity.kind === "augment")} items={currentEntities.filter((entity) => entity.kind === "item")} unresolvedAugmentRefs={unresolvedAugmentRefs} />
         <ItemAssistant championId={champion?.id ?? snapshot.champion.id} augments={currentEntities.filter((entity) => entity.kind === "augment")} />
-        {recommendation?.screenshotExtracted && <section className="overlay-offers"><div className="overlay-section-title"><span>Screenshot offers</span><b>Ranked</b></div><div className="overlay-verdict"><span>AI pick</span><strong>{recommendation.recommendation.name}</strong><p>{recommendation.recommendation.rationale}</p></div></section>}
+        {recommendation?.screenshotExtracted && <section className="overlay-offers screenshot-confirm"><div className="overlay-section-title"><span>Screenshot {snapshot.mode === "aram_mayhem" ? "cards" : "offers"}</span><b>Press 1 / 2 / 3 to confirm</b></div>{recommendation.options.map((option, index) => <button type="button" className={scannedAugmentKeys.includes(option.entity.entityKey) ? "confirmed" : ""} onClick={() => confirmScannedPick(option.entity.entityKey)} key={option.entity.entityKey}><span>{index + 1}</span><strong>{option.entity.name}</strong><small>{option.entity.entityKey === recommendation.recommendation.entityKey ? "Recommended" : "Mark chosen"}</small></button>)}<div className="overlay-verdict"><span>AI recommendation</span><strong>{recommendation.recommendation.name}</strong><p>{recommendation.recommendation.rationale}</p></div></section>}
       </> : snapshot?.phase === "post_game" ? <PostGameAnalysis championName={snapshot.champion.name} /> : snapshot?.phase === "augment_select" || displayedOffers.length > 0 ? (
         <section className="overlay-offers">
           <div className="overlay-section-title"><span>{recommendation?.screenshotExtracted && offered.length === 0 ? "Screenshot offers" : "Auto-detected offers"}</span><b>{recommendation ? "Ranked" : "Analyzing…"}</b></div>
@@ -247,9 +266,9 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
         championId={champion?.id ?? snapshot?.champion.id}
         level={snapshot?.champion.level ?? 18}
         currentEntityKeys={currentEntities.map((entity) => entity.entityKey)}
+        mode={snapshot?.mode}
         onResult={(result) => {
           setRecommendation(result);
-          if (result.screenshotExtracted) setScannedAugmentKeys((current) => [...new Set([...current, result.recommendation.entityKey])]);
           setError("");
         }}
       />}

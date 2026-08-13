@@ -12,7 +12,7 @@ function fileAsDataUrl(file: Blob): Promise<string> {
   });
 }
 
-export function ScreenshotPickerControl({ championId, level, currentEntityKeys, onResult }: { championId: number | string | null | undefined; level: number; currentEntityKeys: string[]; onResult: (result: AIPickerResponse) => void }) {
+export function ScreenshotPickerControl({ championId, level, currentEntityKeys, mode, onResult }: { championId: number | string | null | undefined; level: number; currentEntityKeys: string[]; mode?: "arena" | "aram_mayhem" | null; onResult: (result: AIPickerResponse) => void }) {
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -21,17 +21,17 @@ export function ScreenshotPickerControl({ championId, level, currentEntityKeys, 
     if (!championId) throw new Error("Hover or lock a champion first.");
     if (!image.type.startsWith("image/")) throw new Error("The clipboard does not contain an image.");
     setBusy(true);
-    setStatus("Reading three offers…");
+    setStatus(`Reading three ${mode === "aram_mayhem" ? "cards" : "offers"}…`);
     try {
       const response = await fetch("/api/ai-picker", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ championId, level, currentEntityKeys, screenshotDataUrl: await fileAsDataUrl(image), opponent: "current Arena lobby", useAI: true }),
+        body: JSON.stringify({ championId, level, mode: mode ?? "arena", currentEntityKeys, screenshotDataUrl: await fileAsDataUrl(image), opponent: mode === "aram_mayhem" ? "current ARAM: Mayhem match" : "current Arena lobby", useAI: true }),
       });
       const payload = await response.json() as AIPickerResponse | { error: string };
       if (!response.ok || "error" in payload) throw new Error("error" in payload ? payload.error : "Screenshot analysis failed.");
       onResult(payload);
-      setStatus(`Picked ${payload.recommendation.name}`);
+      setStatus(`Recommended ${payload.recommendation.name}. Confirm your actual pick with 1, 2, or 3.`);
     } catch (caught) {
       setStatus(caught instanceof Error ? caught.message : String(caught));
     } finally { setBusy(false); }
@@ -65,7 +65,7 @@ export function ScreenshotPickerControl({ championId, level, currentEntityKeys, 
   });
 
   return <div className="screenshot-picker-control">
-    <button type="button" title="Use Win+Shift+S, focus this overlay, then press Ctrl+Shift+A" disabled={busy || !championId} onClick={() => void readClipboard()}><span>⌁</span>{busy ? "Analyzing…" : "Paste augment snip"}<kbd>Ctrl Shift A</kbd></button>
+    <button type="button" title="Use Win+Shift+S, focus this overlay, then press Ctrl+Shift+A" disabled={busy || !championId} onClick={() => void readClipboard()}><span>⌁</span>{busy ? "Analyzing…" : mode === "aram_mayhem" ? "Paste Mayhem card snip" : "Paste augment snip"}<kbd>Ctrl Shift A</kbd></button>
     <button className="screenshot-file-button" type="button" disabled={busy || !championId} title="Choose screenshot file" onClick={() => inputRef.current?.click()}>Image</button>
     <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => { const file = event.target.files?.[0]; if (file) void analyzeImage(file); event.target.value = ""; }} />
     {status && <p>{status}</p>}

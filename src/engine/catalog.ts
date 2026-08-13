@@ -253,7 +253,8 @@ export function loadExtremeAugments(
 ): ResolverEffect[] {
   const select = db.prepare(`
     SELECT entity_key, name, rarity, raw_json FROM entities
-    WHERE kind = 'augment' AND lower(name) = lower(?) LIMIT 1
+    WHERE kind = 'augment' AND lower(name) = lower(?)
+    ORDER BY CASE WHEN numeric_id < 1000 THEN 0 ELSE 1 END, numeric_id DESC LIMIT 1
   `);
   return SUPPORTED_AUGMENTS.flatMap((name) => {
     const row = select.get(name) as Row | undefined;

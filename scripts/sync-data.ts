@@ -6,6 +6,9 @@ import { SCHEMA_SQL } from "../src/lib/schema";
 import { rebuildVideoCombos } from "../src/lib/video-combos";
 
 const ARENA_SOURCE = "https://raw.communitydragon.org/latest/cdragon/arena/en_us.json";
+const COMBINED_AUGMENTS_SOURCE = "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/cherry-augments.json";
+const KIWI_DATA_SOURCE = "https://raw.communitydragon.org/latest/game/maps/modespecificdata/kiwi.bin.json";
+const ENGLISH_STRINGTABLE_SOURCE = "https://raw.communitydragon.org/latest/game/en_us/data/menu/en_us/lol.stringtable.json";
 const ITEMS_SOURCE = "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/items.json";
 const VERSIONS_SOURCE = "https://ddragon.leagueoflegends.com/api/versions.json";
 
@@ -353,7 +356,7 @@ function entityKeyByName(db: DatabaseSync, kind: string, name: string): string |
   const row = db.prepare(`
     SELECT entity_key FROM entities
     WHERE kind = ? AND lower(name) = lower(?)
-    ORDER BY purchasable DESC, price DESC, numeric_id DESC
+    ORDER BY purchasable DESC, price DESC, CASE WHEN kind = 'augment' AND numeric_id < 1000 THEN 0 ELSE 1 END, numeric_id DESC
     LIMIT 1
   `).get(kind, name) as { entity_key?: string } | undefined;
   return row?.entity_key ?? null;
@@ -477,15 +480,57 @@ async function main(): Promise<void> {
   const patch = versions[0];
   const championSource = `https://ddragon.leagueoflegends.com/cdn/${patch}/data/en_US/champion.json`;
   const ddragonItemsSource = `https://ddragon.leagueoflegends.com/cdn/${patch}/data/en_US/item.json`;
-  const [arenaPayload, cdragonItems, championPayload, ddragonItemsPayload] = await Promise.all([
+  const [arenaPayload, combinedAugmentRows, kiwiPayload, stringtablePayload, cdragonItems, championPayload, ddragonItemsPayload] = await Promise.all([
     getJson<JsonRecord>(ARENA_SOURCE),
+    getJson<JsonRecord[]>(COMBINED_AUGMENTS_SOURCE),
+    getJson<JsonRecord>(KIWI_DATA_SOURCE),
+    getJson<JsonRecord>(ENGLISH_STRINGTABLE_SOURCE),
     getJson<JsonRecord[]>(ITEMS_SOURCE),
     getJson<JsonRecord>(championSource),
     getJson<JsonRecord>(ddragonItemsSource),
   ]);
 
   const db = openDatabase();
-  const augments = list(arenaPayload.augments).map((rawValue) => {
+  const stringtable = record(stringtablePayload.entries);
+  const translated = (key: unknown): string => text(stringtable[text(key).toLowerCase()]);
+  const kiwiById = new Map<number, JsonRecord>();
+  for (const value of Object.values(kiwiPayload)) {
+    const raw = record(value);
+    const id = integer(raw.AugmentPlatformId);
+    if (id > 0) kiwiById.set(id, raw);
+  }
+  const combinedAugments: ImportedEntity[] = combinedAugmentRows.flatMap((rawValue) => {
+    const raw = record(rawValue);
+    const id = integer(raw.id);
+    const name = text(raw.nameTRA) || text(raw.simpleNameTRA) || text(raw.augmentNameId);
+    if (id <= 0 || !name) return [];
+    const kiwi = kiwiById.get(id) ?? {};
+    const description = stripMarkup(translated(kiwi.DescriptionTra) || translated(kiwi.AugmentTooltipTra));
+    const tooltip = stripMarkup(translated(kiwi.AugmentTooltipTra) || description);
+    const mechanics = analyzeMechanics(name, description, tooltip);
+    const rarity = text(raw.rarity).replace(/^k/i, "").toLowerCase() || "unknown";
+    const iconPath = text(raw.augmentSmallIconPath) || text(kiwi.AugmentSmallIconPath);
+    return [{
+      entityKey: `augment:${id}`,
+      kind: "augment" as const,
+      numericId: id,
+      apiName: text(raw.augmentNameId) || text(kiwi.AugmentNameId),
+      name,
+      rarity,
+      description,
+      tooltip,
+      iconUrl: cdragonAsset(iconPath),
+      purchasable: true,
+      price: 0,
+      tags: [...new Set([...mechanics.tags, id >= 1000 ? "aram_mayhem" : "arena"])],
+      produces: mechanics.produces,
+      consumes: mechanics.consumes,
+      raw: { ...raw, kiwi },
+      patch,
+      sourceUrl: COMBINED_AUGMENTS_SOURCE,
+    }];
+  });
+  const arenaAugments = list(arenaPayload.augments).map((rawValue) => {
     const raw = record(rawValue);
     const id = integer(raw.id);
     const description = stripMarkup(text(raw.desc));
@@ -511,6 +556,9 @@ async function main(): Promise<void> {
     };
   });
 
+  const augmentsById = new Map(combinedAugments.map((augment) => [augment.numericId, augment]));
+  for (const augment of arenaAugments) augmentsById.set(augment.numericId, augment);
+  const augments = [...augmentsById.values()];
   const cdragonById = new Map(cdragonItems.map((item) => [integer(item.id), item]));
   const ddragonItems = record(ddragonItemsPayload.data);
   const items: ImportedEntity[] = Object.entries(ddragonItems)
@@ -591,6 +639,8 @@ async function main(): Promise<void> {
   rebuildCombos(db, patch);
   metadata(db, "patch", patch);
   metadata(db, "arena_source", ARENA_SOURCE);
+  metadata(db, "combined_augments_source", COMBINED_AUGMENTS_SOURCE);
+  metadata(db, "kiwi_data_source", KIWI_DATA_SOURCE);
   metadata(db, "items_source", ddragonItemsSource);
   metadata(db, "last_static_sync", new Date().toISOString());
 

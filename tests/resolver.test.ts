@@ -60,13 +60,13 @@ test("ignores uncatalogued selections and emits a diagnostic without inventing a
   const result = resolveArenaBuild({
     championId: "Test",
     level: 1,
-    augmentIds: ["379"],
+    augmentIds: ["999999"],
     catalog: { champions: [champion], effects: [] },
     options: { onDiagnostic: (message) => diagnostics.push(message) },
   });
-  assert.deepEqual(diagnostics, ["Ignored uncatalogued selection ID: 379"]);
+  assert.deepEqual(diagnostics, ["Ignored uncatalogued selection ID: 999999"]);
   assert.deepEqual(result.effects, []);
-  assert(result.warnings.includes("Ignored uncatalogued selection ID: 379"));
+  assert(result.warnings.includes("Ignored uncatalogued selection ID: 999999"));
   assert.equal(result.status, "converged");
 });
 

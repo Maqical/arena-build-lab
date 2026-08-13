@@ -30,7 +30,7 @@ function seedDatabase(filename: string): void {
       observed_max_mr, observed_max_ms, observed_max_haste, queue_id, started_at, ended_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
-    "sanitized-puuid-brand", 63, "Brand", JSON.stringify(["augment:1", "augment:66", "augment:301", "augment:379", "augment:308"]),
+    "sanitized-puuid-brand", 63, "Brand", JSON.stringify(["augment:1", "augment:66", "augment:301", "augment:379", "augment:308", "augment:999999"]),
     4187, 128, 1024, 2.1, 189, 164, 427, 211, 1740,
     "2026-08-13T00:00:00.000Z", "2026-08-13T00:32:22.000Z",
   );
@@ -42,7 +42,7 @@ function verifyResolverDiagnostic(): void {
   const result = resolveArenaBuild({
     championId: 63,
     level: 18,
-    augmentIds: ["379"],
+    augmentIds: ["999999"],
     catalog: {
       champions: [{
         id: 63,
@@ -59,9 +59,9 @@ function verifyResolverDiagnostic(): void {
     },
     options: { onDiagnostic: (message) => diagnostics.push(message) },
   });
-  assert.deepEqual(diagnostics, ["Ignored uncatalogued selection ID: 379"]);
+  assert.deepEqual(diagnostics, ["Ignored uncatalogued selection ID: 999999"]);
   assert.deepEqual(result.effects, []);
-  assert(result.warnings.includes("Ignored uncatalogued selection ID: 379"));
+  assert(result.warnings.includes("Ignored uncatalogued selection ID: 999999"));
 }
 
 async function waitForServer(server: ChildProcess): Promise<void> {
@@ -101,23 +101,25 @@ async function main(): Promise<void> {
       await page.goto(`http://127.0.0.1:${port}/history?scope=all`, { waitUntil: "domcontentloaded" });
       const brandCard = page.locator(".history-card").filter({ hasText: "Brand" }).first();
       await brandCard.waitFor();
-      await brandCard.getByText("Uncatalogued selection (ID: 379)", { exact: true }).waitFor();
+      await brandCard.getByText("Wild Fire", { exact: true }).waitFor();
+      await brandCard.getByText("Uncatalogued selection (ID: 999999)", { exact: true }).waitFor();
 
       const postGame = await page.request.get(`http://127.0.0.1:${port}/api/post-game-analysis?champion=Brand`);
       assert.equal(postGame.status(), 200);
       const postGameJson = await postGame.json() as { analysis: { picked: string[] } | null };
-      assert(postGameJson.analysis?.picked.includes("Uncatalogued selection (ID: 379)"));
+      assert(postGameJson.analysis?.picked.includes("Wild Fire"));
+      assert(postGameJson.analysis?.picked.includes("Uncatalogued selection (ID: 999999)"));
 
-      const recommendations = await page.request.get(`http://127.0.0.1:${port}/api/augment-builds?championId=63&augmentIds=379`);
+      const recommendations = await page.request.get(`http://127.0.0.1:${port}/api/augment-builds?championId=63&augmentIds=999999`);
       assert.equal(recommendations.status(), 200);
       const recommendationJson = await recommendations.json() as { augmentIds: number[]; augmentNames: string[] };
-      assert.deepEqual(recommendationJson.augmentIds, [379]);
-      assert.deepEqual(recommendationJson.augmentNames, ["Uncatalogued selection (ID: 379)"]);
+      assert.deepEqual(recommendationJson.augmentIds, [999999]);
+      assert.deepEqual(recommendationJson.augmentNames, ["Uncatalogued selection (ID: 999999)"]);
 
       await page.goto(`http://127.0.0.1:${port}/overlay?demo=uncatalogued`, { waitUntil: "domcontentloaded" });
       await page.waitForTimeout(1_500);
       assert.equal(await page.locator(".live-game-hud").count(), 1, `Live HUD did not render. Page text: ${(await page.locator("body").innerText()).slice(0, 1_000)}`);
-      await page.getByText("Uncatalogued selection (ID: 379)", { exact: true }).waitFor();
+      await page.getByText("Uncatalogued selection (ID: 999999)", { exact: true }).waitFor();
       assert.deepEqual(errors, []);
     } finally {
       await browser.close();
