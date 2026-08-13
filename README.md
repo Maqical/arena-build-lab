@@ -23,6 +23,26 @@ The live companion is at <http://localhost:3000/overlay>. Open it as a 300x600 b
 
 Run `npm run electron:build` on Windows to produce `dist/Arena-Build-Lab-1.0.0-Setup.exe`. The installer launches the existing Next production server locally, opens the 300×600 frameless overlay, keeps it in the system tray when closed, and offers a startup toggle. Open Settings from the tray to save API keys, adjust opacity/scale, or launch data workers. `Ctrl+Shift+A` is registered at the desktop-shell level: it captures the primary display into the clipboard and invokes the existing screenshot augment picker. Pass `--obs` to the Electron entrypoint for a chroma-green OBS window (`electron electron/main.cjs --obs`).
 
+### Download & install
+
+Download `Arena-Build-Lab-1.0.0-Setup.exe` for Windows, run it, and launch Arena Build Lab from the Start Menu or desktop shortcut. The app keeps its database and settings under the Windows user-data folder, so upgrades do not overwrite personal history. On first launch it initializes the local Arena database and refreshes bundled data in the background.
+
+The desktop release includes the Live Game HUD, recursive Extreme Build Engine, AI/screenshot augment picker, local Riot Match warehouse, local meta aggregation, item assistant, trophy case, and tray-controlled overlay customization. No Python installation or terminal is required for the bundled Riot, CommunityDragon/Data Dragon, and YouTube worker assets.
+
+### Development
+
+Developers can run the stack from a checkout with Node 24+, Python 3.14+, and the virtual environment:
+
+```powershell
+npm install
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r workers\requirements.txt
+npm run data:sync
+npm run dev
+```
+
+Use `npm run build:workers` to compile the Python and bundled Node workers, then `npm run electron:build` to create the Windows installer. `npm test`, `npm run lint`, and `npx tsc --noEmit` are the normal pre-release checks.
+
 The mathematical build table is at <http://localhost:3000/extreme-builds>. It loads `data/extreme_builds.csv` on the server and provides champion/objective/search filters, HP/AD/AP/AS sorting, scenario-aware stats, and copyable build plans. The live Champion Select dashboard is at <http://localhost:3000/champ-select>; it follows the same LCU stream and combines the hovered champion with local extreme builds, curated conversion paths, and synced meta labels.
 
 `data:sync` refreshes patch-aware champion, augment, and Arena item data. `youtube:sync` incrementally catalogs King Nidhogg uploads and retrieves captions for the newest detailed videos. Both commands are safe to rerun.

@@ -29,7 +29,8 @@
     "videos:combos": "tsx scripts/sync-video-combos.ts",
     "setup": "npm run data:sync",
     "electron:dev": "npm run build && electron electron/main.cjs",
-    "electron:build": "npm run build && electron-builder --win nsis"
+    "build:workers": "python scripts/build_workers.py",
+    "electron:build": "npm run build:workers && npm run build && electron-builder --win nsis"
   },
   "dependencies": {
     "next": "16.3.0",
@@ -45,8 +46,6 @@
     "electron": "^43.4.0",
     "electron-builder": "^26.15.3",
     "eslint": "9.39.2",
-    "electron": "^37.2.6",
-    "electron-builder": "^26.0.12",
     "eslint-config-next": "16.3.0",
     "playwright-core": "^1.61.0",
     "tsx": "4.21.0",
@@ -61,7 +60,10 @@
     "extraResources": [
       { "from": ".next/standalone", "to": "standalone" },
       { "from": ".next/static", "to": "standalone/.next/static" },
-      { "from": "data/arena.sqlite", "to": "data/arena.sqlite" }
+      { "from": "data/arena.sqlite", "to": "data/arena.sqlite" },
+      { "from": "build-workers/arena-youtube-sync.exe", "to": "workers/arena-youtube-sync.exe" },
+      { "from": "build-workers/riot-sync.cjs", "to": "workers/riot-sync.cjs" },
+      { "from": "build-workers/data-sync.cjs", "to": "workers/data-sync.cjs" }
     ],
     "win": { "target": [{ "target": "nsis", "arch": ["x64"] }] },
     "nsis": { "oneClick": false, "perMachine": false, "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true, "createStartMenuShortcut": true }

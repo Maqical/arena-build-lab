@@ -395,6 +395,9 @@ footer { color: #5f5868; font-size: 10px; text-align: center; margin-top: 42px; 
 .settings-actions { display: flex; flex-wrap: wrap; gap: 9px; }
 .settings-status { color: #75dca4 !important; }
 .settings-warning { padding: 11px 13px; color: #f1c26f; background: #2d2113; border: 1px solid #644a25; border-radius: 8px; font-size: 12px; }
+.overlay-welcome { margin: 10px 12px; padding: 13px; border: 1px solid #6a4e2d; border-radius: 9px; background: #2b2015; }
+.overlay-welcome strong { color: #f4c778; font-size: 12px; }
+.overlay-welcome p { margin: 5px 0 0; color: #c3a984; font-size: 10px; line-height: 1.4; }
 .overlay-offers dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; margin: 0; }
 .overlay-offers dl div { display: flex; flex-direction: column; align-items: flex-end; }
 .overlay-offers dt { color: #716879; font-size: 6px; }

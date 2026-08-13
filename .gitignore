@@ -1,6 +1,10 @@
 node_modules/
 .next/
 dist/
+build-workers/
+.worker-build/
+build/
+*.spec
 out/
 .venv/
 data/*.sqlite

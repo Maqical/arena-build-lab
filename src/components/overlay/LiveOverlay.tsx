@@ -78,6 +78,7 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
   const [liveBuild, setLiveBuild] = useState<LiveResolveResponse | null>(null);
   const [error, setError] = useState("");
   const [visible, setVisible] = useState(true);
+  const [welcome] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("welcome") === "1");
   const recommendationSignature = useRef("");
   const resolveSignature = useRef("");
 
@@ -176,6 +177,8 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
         <div><span className={`overlay-dot ${connectionState}`} /><div><strong>{phaseLabel(snapshot)}</strong><small>{snapshot?.isArena ? snapshot.queueName || "Arena detected" : snapshot?.connection.lastError || "Waiting for local client"}</small></div></div>
         <div className="overlay-status-actions"><b>{snapshot?.connection.connected ? "LCU" : "OFF"}</b><button type="button" className="overlay-eye" aria-label={visible ? "Hide overlay details" : "Show overlay details"} onClick={() => setVisible((current) => !current)}>{visible ? "◉" : "◌"}</button></div>
       </header>
+
+      {welcome && <section className="overlay-welcome"><strong>Fetching latest Arena data…</strong><p>This only happens once. The overlay will switch to normal mode when initialization finishes.</p></section>}
 
       {!visible && <p className="overlay-hidden-note">Overlay details hidden <button type="button" onClick={() => setVisible(true)}>Show</button></p>}
 

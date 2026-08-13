@@ -11,6 +11,7 @@ let serverProcess;
 let mainWindow;
 let tray;
 let appearance = { opacity: 1, scale: 1 };
+let dataInitializing = false;
 const settingsPath = () => path.join(app.getPath("userData"), "user_settings.json");
 
 function readSettings() {
@@ -36,6 +37,31 @@ function prepareUserData() {
   const target = path.join(destination, "arena.sqlite");
   if (!fs.existsSync(target) && fs.existsSync(source)) fs.copyFileSync(source, target);
   return target;
+}
+
+function packagedWorker(name) {
+  return rootPath("workers", name);
+}
+
+function spawnWorker(worker) {
+  const settings = readSettings();
+  const env = { ...process.env, RIOT_API_KEY: settings.riotApiKey, OPENAI_API_KEY: settings.openAiApiKey, ARENA_DB_PATH: path.join(app.getPath("userData"), "data", "arena.sqlite") };
+  if (app.isPackaged) {
+    if (worker === "youtube") return spawn(packagedWorker("arena-youtube-sync.exe"), ["--database", env.ARENA_DB_PATH, "--details-limit", "20", "--transcripts"], { env, windowsHide: true, stdio: "ignore" });
+    const script = worker === "riot" ? packagedWorker("riot-sync.cjs") : packagedWorker("data-sync.cjs");
+    return spawn(process.execPath, [script], { env: { ...env, ELECTRON_RUN_AS_NODE: "1" }, cwd: app.getPath("userData"), windowsHide: true, stdio: "ignore" });
+  }
+  const command = worker === "youtube" ? "youtube:sync" : worker === "riot" ? "riot:sync" : "data:sync";
+  const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+  return spawn(npm, ["run", command], { cwd: path.resolve(__dirname, ".."), env, detached: true, stdio: "ignore", windowsHide: true });
+}
+
+function initializeDataIfNeeded() {
+  const database = prepareUserData();
+  if (fs.existsSync(database) || dataInitializing) return;
+  dataInitializing = true;
+  const child = spawnWorker("data");
+  child.on("close", () => { dataInitializing = false; if (mainWindow && !mainWindow.isDestroyed()) openOverlay(); });
 }
 
 function startNext() {
@@ -100,7 +126,7 @@ function createWindow() {
   });
   mainWindow.setMenuBarVisibility(false);
   mainWindow.on("close", (event) => { if (!app.isQuitting) { event.preventDefault(); mainWindow.hide(); } });
-  mainWindow.loadURL(`http://127.0.0.1:${PORT}/overlay${OBS_MODE ? "?obs=1" : ""}`);
+  mainWindow.loadURL(`http://127.0.0.1:${PORT}/overlay${OBS_MODE ? "?obs=1" : dataInitializing ? "?welcome=1" : ""}`);
   mainWindow.webContents.on("did-finish-load", () => {
     const css = OBS_MODE
       ? `html,body,.overlay-page{background:#00FF00!important}.overlay-topline,footer{display:none!important}.live-overlay{background:transparent!important;box-shadow:none!important}body{-webkit-app-region:drag}button,a,input,select,textarea{ -webkit-app-region:no-drag }`
@@ -152,17 +178,16 @@ ipcMain.handle("appearance:apply", (_event, next) => applyAppearance(next || app
 ipcMain.handle("window:overlay", () => { openOverlay(); return { ok: true }; });
 ipcMain.handle("updates:check", () => ({ ok: false, message: "Updates are not configured for this local build yet." }));
 ipcMain.handle("worker:run", (_event, worker) => {
-  if (app.isPackaged) return { ok: false, message: "Worker sync requires the project checkout; use the packaged app's next release for bundled workers." };
-  const command = worker === "youtube" ? "youtube:sync" : "riot:sync";
-  const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-  const child = spawn(npm, ["run", command], { cwd: path.resolve(__dirname, ".."), env: { ...process.env, ...Object.fromEntries(Object.entries(readSettings()).filter(([key]) => key === "riotApiKey" || key === "openAiApiKey").map(([key, value]) => [key === "riotApiKey" ? "RIOT_API_KEY" : "OPENAI_API_KEY", value])) }, detached: true, stdio: "ignore", windowsHide: true });
+  const selected = worker === "youtube" ? "youtube" : "riot";
+  const child = spawnWorker(selected);
   child.unref();
-  return { ok: true, message: `${command} started in the background.` };
+  return { ok: true, message: `${selected === "youtube" ? "YouTube catalog" : "Riot match"} sync started in the background.` };
 });
 
 app.whenReady().then(async () => {
   const saved = readSettings();
   appearance = { opacity: saved.opacity, scale: saved.scale };
+  initializeDataIfNeeded();
   startNext();
   await waitForServer();
   createWindow();
