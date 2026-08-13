@@ -77,7 +77,7 @@ function resetOverlayPosition() {
 function rootPath(...parts) { return path.join(app.isPackaged ? process.resourcesPath : path.resolve(__dirname, ".."), ...parts); }
 
 function appIconPath() {
-  return rootPath("assets", "arena-build-lab.png");
+  return rootPath("assets", "arena-build-lab-v2-icon.png");
 }
 
 function prepareUserData() {
