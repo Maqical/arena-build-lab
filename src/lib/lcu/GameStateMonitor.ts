@@ -28,6 +28,7 @@ export type GameStateSnapshot = {
   queueId: number | null;
   queueName: string;
   champion: { id: number | null; name: string; level: number };
+  lobbyMembers: Array<{ puuid: string; gameName: string; tagLine: string }>;
   currentEntityRefs: string[];
   offeredAugmentRefs: string[];
   liveStats: LiveChampionStats | null;
@@ -183,6 +184,22 @@ function championFromSelect(session: ChampSelectSession | null): number | null {
   return Number.isInteger(id) && id > 0 ? id : null;
 }
 
+function lobbyMembers(lobby: UnknownRecord | null, champSelect: ChampSelectSession | null): GameStateSnapshot["lobbyMembers"] {
+  const candidates = [
+    ...(Array.isArray(lobby?.members) ? lobby.members : []),
+    ...(Array.isArray(champSelect?.myTeam) ? champSelect.myTeam : []),
+  ].map(record).filter((entry): entry is UnknownRecord => Boolean(entry));
+  const members = new Map<string, GameStateSnapshot["lobbyMembers"][number]>();
+  for (const entry of candidates) {
+    const puuid = String(entry.puuid ?? entry.playerUuid ?? entry.summonerPuuid ?? "");
+    const gameName = String(entry.gameName ?? entry.summonerName ?? record(entry.riotId)?.gameName ?? "Arena player");
+    const tagLine = String(entry.tagLine ?? record(entry.riotId)?.tagLine ?? "");
+    const key = puuid || `${gameName}#${tagLine}`;
+    if (key) members.set(key, { puuid, gameName, tagLine });
+  }
+  return [...members.values()];
+}
+
 function arenaDetails(session: GameflowSession | null, lobby: UnknownRecord | null): { isArena: boolean; queueId: number | null; queueName: string } {
   const map = record(session?.map);
   const gameData = record(session?.gameData);
@@ -247,6 +264,7 @@ export class GameStateMonitor extends EventEmitter {
     queueId: null,
     queueName: "",
     champion: { id: null, name: "", level: 1 },
+    lobbyMembers: [],
     currentEntityRefs: [],
     offeredAugmentRefs: [],
     liveStats: null,
@@ -352,6 +370,7 @@ export class GameStateMonitor extends EventEmitter {
         queueId: arena.queueId,
         queueName: arena.queueName,
         champion: { id: championId, name: livePlayer.name, level: livePlayer.level },
+        lobbyMembers: lobbyMembers(lobby, champSelect),
         currentEntityRefs,
         offeredAugmentRefs,
         liveStats: livePlayer.stats,

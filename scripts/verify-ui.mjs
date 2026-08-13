@@ -158,7 +158,10 @@ try {
   const championSelectPage = await browser.newPage({ viewport: { width: 1180, height: 900 }, deviceScaleFactor: 1 });
   championSelectPage.on("pageerror", (error) => errors.push(error.message));
   await championSelectPage.goto("http://localhost:3000/champ-select", { waitUntil: "domcontentloaded" });
-  await championSelectPage.getByLabel("Preview champion").selectOption({ label: "Sion" });
+  const previewChampion = championSelectPage.getByLabel("Preview champion");
+  await previewChampion.waitFor();
+  await championSelectPage.locator('.champ-select-assistant[data-hydrated="true"]').waitFor();
+  await previewChampion.selectOption({ label: "Sion" });
   await championSelectPage.locator(".champ-extreme").getByText(/658,207 HP/).waitFor();
   assert(await championSelectPage.locator(".champ-duos article").count() >= 3);
   assert(await championSelectPage.locator(".champ-picks article").count() >= 4);

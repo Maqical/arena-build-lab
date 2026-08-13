@@ -3,6 +3,7 @@ import "server-only";
 import { getDatabase } from "@/lib/db";
 import { getExtremeBuildCsvRows } from "@/lib/extreme-build-csv";
 import type { ChampSelectEntityRecommendation, ChampSelectRecommendation, DuoRecommendation } from "@/lib/champ-select-types";
+import { getDuoSynergies } from "@/lib/duo-synergy";
 
 type Row = Record<string, unknown>;
 type CandidateScore = { score: number; reasons: Set<string> };
@@ -124,18 +125,21 @@ export function getChampSelectRecommendation(championReference: string | number)
     FROM champions c LEFT JOIN arena_meta m ON m.entity_key='champion:'||c.champion_key
     WHERE c.id<>?
   `).all(championId) as Row[];
+  const calculatedSynergies = new Map(getDuoSynergies(championId).map((entry) => [entry.championId, entry]));
   const duoRecommendations: DuoRecommendation[] = duoRows.map((row) => {
     const tags = jsonArray(row.tags_json);
     const fitTags = tags.filter((tag) => desiredTags.includes(tag));
-    const score = fitTags.length * 9 + Number(row.win_rate ?? 0) + tierWeight(String(row.tier ?? "")) * 1.5;
+    const synergy = calculatedSynergies.get(Number(row.id));
+    const score = (synergy ? 1000 + synergy.synergyScore * 100 : 0) + fitTags.length * 9 + Number(row.win_rate ?? 0) + tierWeight(String(row.tier ?? "")) * 1.5;
     return {
       score,
       recommendation: {
         championId: Number(row.id), championKey: String(row.champion_key), name: String(row.name), iconUrl: String(row.icon_url), tags,
-        tier: String(row.tier ?? ""), winRate: row.win_rate == null ? null : Number(row.win_rate), pickRate: row.pick_rate == null ? null : Number(row.pick_rate), fitTags,
+        tier: String(row.tier ?? ""), winRate: synergy ? synergy.firstPlaceRate * 100 : row.win_rate == null ? null : Number(row.win_rate), pickRate: row.pick_rate == null ? null : Number(row.pick_rate), fitTags,
+        synergyScore: synergy?.synergyScore, gamesTogether: synergy?.gamesTogether,
       },
     };
-  }).filter((entry) => entry.recommendation.fitTags.length > 0).sort((left, right) => right.score - left.score).slice(0, 4).map((entry) => entry.recommendation);
+  }).filter((entry) => entry.recommendation.fitTags.length > 0 || (entry.recommendation.gamesTogether ?? 0) > 0).sort((left, right) => right.score - left.score).slice(0, 4).map((entry) => entry.recommendation);
 
   return {
     champion: { id: championId, key: championKey, name: championName, iconUrl: String(champion.icon_url), tags: championTags },
@@ -150,4 +154,3 @@ export function getChampSelectRecommendation(championReference: string | number)
     note: "Duo candidates use complementary champion roles plus individual Arena meta; they are not direct duo win-rate claims. Build recommendations use local extreme benchmarks and curated conversion paths.",
   };
 }
-

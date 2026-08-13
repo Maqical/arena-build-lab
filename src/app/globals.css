@@ -429,6 +429,17 @@ footer { color: #5f5868; font-size: 10px; text-align: center; margin-top: 42px; 
 .overlay-welcome { margin: 10px 12px; padding: 13px; border: 1px solid #6a4e2d; border-radius: 9px; background: #2b2015; }
 .overlay-welcome strong { color: #f4c778; font-size: 12px; }
 .overlay-welcome p { margin: 5px 0 0; color: #c3a984; font-size: 10px; line-height: 1.4; }
+.lobby-scanner { margin: 0; padding: 9px; }
+.lobby-scanner article { display: grid; grid-template-columns: minmax(0,1fr) 104px; gap: 7px; align-items: center; padding: 7px 3px; border-top: 1px solid rgba(255,255,255,.06); }
+.lobby-scanner article > div strong, .lobby-scanner article > div span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lobby-scanner article > div strong { color: #eaf6ff; font-size: 10px; }
+.lobby-scanner article > div span { color: #7f96aa; font-size: 8px; }
+.lobby-scanner dl, .post-game-peaks { display: grid; grid-template-columns: repeat(3,1fr); gap: 4px; margin: 0; }
+.lobby-scanner dl div, .post-game-peaks span { padding: 4px; border-radius: 5px; background: rgba(5,12,22,.5); text-align: center; }
+.lobby-scanner dt { color: #71899e; font-size: 7px; }
+.lobby-scanner dd { margin: 0; color: #66ddff; font: 9px var(--font-geist-mono), monospace; }
+.post-game-peaks { margin: 9px 0; }
+.post-game-peaks span { color: #75eab0; font: 9px var(--font-geist-mono), monospace; }
 .overlay-offers dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; margin: 0; }
 .overlay-offers dl div { display: flex; flex-direction: column; align-items: flex-end; }
 .overlay-offers dt { color: #716879; font-size: 6px; }
@@ -655,3 +666,9 @@ footer { color: #5f5868; font-size: 10px; text-align: center; margin-top: 42px; 
   .history-stats { grid-column: 2; align-items: flex-start; text-align: left; }
   .trophy-grid { grid-template-columns: 1fr; }
 }
+
+/* Final card-layout overrides live after legacy responsive table rules. */
+.extreme-table.extreme-build-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; overflow: visible; border: 0; background: transparent; }
+.extreme-row.extreme-build-card { display: flex; flex-direction: column; gap: 13px; min-width: 0; padding: 17px; }
+.extreme-build-card .copy-build { position: relative; z-index: 5; display: block; width: 100%; }
+@media (max-width: 760px) { .extreme-table.extreme-build-grid { grid-template-columns: 1fr; } }

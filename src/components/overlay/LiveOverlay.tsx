@@ -5,6 +5,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChampSelectAssistant } from "@/components/overlay/ChampSelectAssistant";
 import { ItemAssistant } from "@/components/overlay/ItemAssistant";
 import { LiveGameHUD } from "@/components/overlay/LiveGameHUD";
+import { LobbyScanner } from "@/components/overlay/LobbyScanner";
+import { PostGameAnalysis } from "@/components/overlay/PostGameAnalysis";
 import { ScreenshotPickerControl } from "@/components/overlay/ScreenshotPickerControl";
 import type { AIPickerResponse } from "@/lib/ai-picker-types";
 import type { GameStateSnapshot } from "@/lib/lcu/GameStateMonitor";
@@ -59,6 +61,7 @@ function demoSnapshot(entities: OverlayCatalogEntity[], champions: Champion[], p
     queueId: 1740,
     queueName: "Arena demo",
     champion: { id: sion?.id ?? 14, name: "Sion", level: phase === "champ_select" ? 1 : 18 },
+    lobbyMembers: [],
     currentEntityRefs: phase === "champ_select" ? [] : [entities.find((entity) => entity.name === "Overlord's Bloodmail")?.entityKey ?? ""].filter(Boolean),
     offeredAugmentRefs: phase === "augment_select" ? offered : [],
     liveStats: phase === "champ_select" ? null : { currentHealth: 11_400, maxHealth: 16_300, attackDamage: 630, abilityPower: 0, attackSpeed: 0.91, armor: 171, magicResistance: 103, moveSpeed: 345, abilityHaste: 25 },
@@ -190,11 +193,11 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
         {championMeta && <a href={championMeta.sourceUrl} target="_blank" rel="noreferrer"><strong>{championMetaPercent?.toFixed(1)}%</strong><span>{championMeta.sourceName === "riot_api_local" ? `Local WR · ${championMeta.sampleSize ?? 0} games` : `Meta WR · ${championMeta.tier}`}</span></a>}
       </section>
 
-      {snapshot?.phase === "champ_select" ? <ChampSelectAssistant champions={champions} snapshot={snapshot} compact /> : snapshot?.phase === "in_progress" ? <>
+      {snapshot?.phase === "arena_lobby" ? <LobbyScanner snapshot={snapshot} /> : snapshot?.phase === "champ_select" ? <ChampSelectAssistant champions={champions} snapshot={snapshot} compact /> : snapshot?.phase === "in_progress" ? <>
         <LiveGameHUD snapshot={snapshot} build={liveBuild} augments={currentEntities.filter((entity) => entity.kind === "augment")} />
         <ItemAssistant snapshot={snapshot} />
         {recommendation?.screenshotExtracted && <section className="overlay-offers"><div className="overlay-section-title"><span>Screenshot offers</span><b>Ranked</b></div><div className="overlay-verdict"><span>AI pick</span><strong>{recommendation.recommendation.name}</strong><p>{recommendation.recommendation.rationale}</p></div></section>}
-      </> : snapshot?.phase === "post_game" ? <section className="overlay-post-game"><div className="overlay-section-title"><span>Match complete</span><b>Recorded locally</b></div><strong>{snapshot.champion.name || "Arena match"}</strong><p>Peak stats and the final observation are available in your Trophy Case.</p><a href="/trophies">Open Trophy Case</a></section> : snapshot?.phase === "augment_select" || displayedOffers.length > 0 ? (
+      </> : snapshot?.phase === "post_game" ? <PostGameAnalysis championName={snapshot.champion.name} /> : snapshot?.phase === "augment_select" || displayedOffers.length > 0 ? (
         <section className="overlay-offers">
           <div className="overlay-section-title"><span>{recommendation?.screenshotExtracted && offered.length === 0 ? "Screenshot offers" : "Auto-detected offers"}</span><b>{recommendation ? "Ranked" : "Analyzing…"}</b></div>
           {displayedOffers.map((entity, index) => {

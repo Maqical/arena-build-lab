@@ -1,3 +1,5 @@
+export {};
+
 const pages = process.argv.slice(2).filter(Boolean);
 const targets = pages.length > 0 ? pages : [
   "https://www.metasrc.com/lol/arena/champions",

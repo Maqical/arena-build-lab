@@ -22,6 +22,8 @@ export type DuoRecommendation = {
   winRate: number | null;
   pickRate: number | null;
   fitTags: string[];
+  synergyScore?: number;
+  gamesTogether?: number;
 };
 
 export type ChampSelectRecommendation = {
@@ -33,4 +35,3 @@ export type ChampSelectRecommendation = {
   extremeBuilds: ExtremeBuildCsvRow[];
   note: string;
 };
-
