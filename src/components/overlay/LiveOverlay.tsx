@@ -197,7 +197,7 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
 
       {snapshot?.phase === "disconnected" ? null : snapshot?.phase === "arena_lobby" ? <LobbyScanner snapshot={snapshot} /> : snapshot?.phase === "champ_select" ? <ChampSelectAssistant champions={champions} snapshot={snapshot} compact /> : snapshot?.phase === "in_progress" ? <>
         <LiveGameHUD snapshot={snapshot} build={liveBuild} augments={currentEntities.filter((entity) => entity.kind === "augment")} />
-        <ItemAssistant snapshot={snapshot} />
+        <ItemAssistant snapshot={snapshot} championId={champion?.id ?? snapshot.champion.id} augments={currentEntities.filter((entity) => entity.kind === "augment")} />
         {recommendation?.screenshotExtracted && <section className="overlay-offers"><div className="overlay-section-title"><span>Screenshot offers</span><b>Ranked</b></div><div className="overlay-verdict"><span>AI pick</span><strong>{recommendation.recommendation.name}</strong><p>{recommendation.recommendation.rationale}</p></div></section>}
       </> : snapshot?.phase === "post_game" ? <PostGameAnalysis championName={snapshot.champion.name} /> : snapshot?.phase === "augment_select" || displayedOffers.length > 0 ? (
         <section className="overlay-offers">

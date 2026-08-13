@@ -21,6 +21,12 @@ export function getDatabase(): DatabaseSync {
     const db = new DatabaseSync(filename);
     db.exec(SCHEMA_SQL);
     db.exec("PRAGMA busy_timeout = 10000");
+    db.exec(`
+      INSERT OR IGNORE INTO participant_augments(match_id, participant_index, augment_id, slot_index)
+      SELECT rp.match_id, rp.participant_index, CAST(j.value AS INTEGER), CAST(j.key AS INTEGER)
+      FROM riot_participants rp, json_each(rp.augments_json) j
+      WHERE CAST(j.value AS INTEGER) > 0
+    `);
     const comboColumns = db.prepare("PRAGMA table_info(combos)").all() as Array<{ name: string }>;
     if (!comboColumns.some((column) => column.name === "origin")) {
       db.exec("ALTER TABLE combos ADD COLUMN origin TEXT NOT NULL DEFAULT 'curated'");

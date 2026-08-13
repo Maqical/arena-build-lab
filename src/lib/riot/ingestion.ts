@@ -117,6 +117,10 @@ export function insertParsedMatch(db: DatabaseSync, match: ParsedRiotMatch, inge
         raw_json, ingested_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
+    const insertParticipantAugment = db.prepare(`
+      INSERT OR IGNORE INTO participant_augments(match_id, participant_index, augment_id, slot_index)
+      VALUES (?, ?, ?, ?)
+    `);
     for (const participant of match.participants) {
       insertParticipant.run(
         match.matchId,
@@ -134,6 +138,11 @@ export function insertParsedMatch(db: DatabaseSync, match: ParsedRiotMatch, inge
         participant.rawJson,
         ingestedAt,
       );
+      participant.augmentIds.forEach((augmentId, slotIndex) => {
+        if (Number.isInteger(augmentId) && augmentId > 0) {
+          insertParticipantAugment.run(match.matchId, participant.participantIndex, augmentId, slotIndex);
+        }
+      });
     }
     db.exec("COMMIT");
     return true;

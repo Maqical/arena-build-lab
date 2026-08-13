@@ -237,6 +237,21 @@ ON riot_participants(puuid, match_id);
 CREATE INDEX IF NOT EXISTS riot_participants_champion_idx
 ON riot_participants(champion_id, placement);
 
+-- Query projection derived from immutable riot_participants. The JSON column
+-- remains authoritative; this table makes champion + augment intersections fast.
+CREATE TABLE IF NOT EXISTS participant_augments (
+  match_id TEXT NOT NULL,
+  participant_index INTEGER NOT NULL,
+  augment_id INTEGER NOT NULL,
+  slot_index INTEGER NOT NULL,
+  PRIMARY KEY(match_id, participant_index, augment_id),
+  FOREIGN KEY(match_id, participant_index)
+    REFERENCES riot_participants(match_id, participant_index) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS participant_augments_lookup_idx
+ON participant_augments(augment_id, match_id, participant_index);
+
 CREATE TABLE IF NOT EXISTS cohort_members (
   cohort_id TEXT NOT NULL,
   puuid TEXT NOT NULL,

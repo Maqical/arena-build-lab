@@ -380,7 +380,7 @@ export class GameStateMonitor extends EventEmitter {
           championName: livePlayer.name || previous?.championName || this.snapshotValue.champion.name,
           augmentIds: unique([
             ...(previous?.augmentIds ?? []),
-            ...currentEntityRefs.filter((reference) => /^augment:/i.test(reference)),
+            ...currentEntityRefs.filter((reference) => !/^item:/i.test(reference)),
           ]),
           maxima: mergeObservedMaxima(previous?.maxima ?? null, livePlayer.stats),
           queueId: arena.queueId ?? previous?.queueId ?? this.snapshotValue.queueId,

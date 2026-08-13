@@ -10,6 +10,7 @@ import { calculateMeta } from "../src/lib/meta-aggregation";
 import { cohortMembers, ingestCohortMember, insertParsedMatch, upsertCohortMember } from "../src/lib/riot/ingestion";
 import { parseRiotId, platformFromTagLine, RiotApiClient } from "../src/lib/riot/riot-api";
 import { SCHEMA_SQL } from "../src/lib/schema";
+import { queryBuildsForAugments } from "../src/lib/augment-build-query";
 
 const fixture = JSON.parse(fs.readFileSync(new URL("./fixtures/riot_match_sample.json", import.meta.url), "utf8")) as unknown;
 
@@ -49,6 +50,13 @@ test("stores immutable matches once and never duplicates participants", () => {
   assert.equal(insertParsedMatch(db, match, "2026-08-13T00:00:00.000Z"), false);
   assert.equal((db.prepare("SELECT COUNT(*) AS count FROM riot_matches").get() as { count: number }).count, 1);
   assert.equal((db.prepare("SELECT COUNT(*) AS count FROM riot_participants").get() as { count: number }).count, 2);
+  assert.equal((db.prepare("SELECT COUNT(*) AS count FROM participant_augments").get() as { count: number }).count, 6);
+  db.prepare(`INSERT INTO entities(entity_key,kind,numeric_id,api_name,name,rarity,description,tooltip,icon_url,purchasable,price,tags_json,produces_json,consumes_json,raw_json,patch,source_url)
+    VALUES ('item:3083','item',3083,'WarmogsArmor','Warmog''s Armor','','','','https://example.test/3083.png',1,3100,'[]','[]','[]','{}','test','fixture')`).run();
+  const build = queryBuildsForAugments(db, 14, [137000]);
+  assert.equal(build.sampleSize, 1);
+  assert.equal(build.lowSample, true);
+  assert.equal(build.items.find((item) => item.numericId === 3083)?.pickRate, 1);
   db.close();
 });
 

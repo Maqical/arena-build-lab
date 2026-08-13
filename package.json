@@ -1,6 +1,6 @@
 {
   "name": "arena-build-lab",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "private": true,
   "main": "electron/main.cjs",
   "description": "Local-first League of Legends Arena companion overlay",
@@ -19,6 +19,7 @@
     "audit:data": "tsx scripts/audit_data.ts",
     "audit:endpoints": "tsx scripts/audit_endpoints.ts",
     "audit:resolver": "tsx scripts/audit_resolver.ts",
+    "audit:lcu": "tsx scripts/audit_lcu_payload.ts",
     "extremes:build": "tsx scripts/generate-extreme-builds.ts",
     "extremes:export": "tsx scripts/export-extreme-builds.ts",
     "extremes": "npm run extremes:build && npm run extremes:export",
