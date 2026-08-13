@@ -60,7 +60,6 @@
     "extraResources": [
       { "from": ".next/standalone", "to": "standalone" },
       { "from": ".next/static", "to": "standalone/.next/static" },
-      { "from": "data/arena.sqlite", "to": "data/arena.sqlite" },
       { "from": "build-workers/arena-youtube-sync.exe", "to": "workers/arena-youtube-sync.exe" },
       { "from": "build-workers/riot-sync.cjs", "to": "workers/riot-sync.cjs" },
       { "from": "build-workers/data-sync.cjs", "to": "workers/data-sync.cjs" }
