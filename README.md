@@ -19,6 +19,10 @@ The live draft picker is at <http://localhost:3000/ai-picker>. Manual three-opti
 
 The live companion is at <http://localhost:3000/overlay>. Open it as a 300x600 browser window on a second monitor. It discovers the running League Client lockfile, follows Arena lobby/champion-select/in-game transitions over the local LCU event stream, and reads current champion stats and items from Riot's local Live Client Data API. The overlay sends detected state into the existing resolver and AI picker; no process injection, memory reading, or automated game input is used. Add `?demo=1` to preview augment selection or `?demo=champ-select` to preview Champion Select without running League.
 
+## Desktop distribution
+
+Run `npm run electron:build` on Windows to produce `dist/Arena-Build-Lab-0.9.0-Setup.exe`. The installer launches the existing Next production server locally, opens the 300×600 frameless overlay, keeps it in the system tray when closed, and offers a startup toggle. `Ctrl+Shift+A` is registered at the desktop-shell level: it captures the primary display into the clipboard and invokes the existing screenshot augment picker. Pass `--obs` to the Electron entrypoint for a chroma-green OBS window (`electron electron/main.cjs --obs`).
+
 The mathematical build table is at <http://localhost:3000/extreme-builds>. It loads `data/extreme_builds.csv` on the server and provides champion/objective/search filters, HP/AD/AP/AS sorting, scenario-aware stats, and copyable build plans. The live Champion Select dashboard is at <http://localhost:3000/champ-select>; it follows the same LCU stream and combines the hovered champion with local extreme builds, curated conversion paths, and synced meta labels.
 
 `data:sync` refreshes patch-aware champion, augment, and Arena item data. `youtube:sync` incrementally catalogs King Nidhogg uploads and retrieves captions for the newest detailed videos. Both commands are safe to rerun.
