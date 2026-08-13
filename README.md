@@ -1,6 +1,6 @@
 # Arena Build Lab
 
-Local-first League of Legends Arena reference, evidence catalog, stat-conversion calculator, personal match journal, and build-combination explorer. It combines current CommunityDragon/Data Dragon records with an incremental King Nidhogg YouTube catalog and an auditable stat producer/consumer graph.
+Local-first League of Legends Arena reference, evidence catalog, stat-conversion calculator, personal match journal, and build-combination explorer. It combines current structured game data with an auditable stat producer/consumer graph and optional video evidence.
 
 ## Start
 
@@ -45,7 +45,7 @@ Use `npm run build:workers` to compile the Python and bundled Node workers, then
 
 The mathematical build table is at <http://localhost:3000/extreme-builds>. It loads `data/extreme_builds.csv` on the server and provides champion/objective/search filters, HP/AD/AP/AS sorting, scenario-aware stats, and copyable build plans. The live Champion Select dashboard is at <http://localhost:3000/champ-select>; it follows the same LCU stream and combines the hovered champion with local extreme builds, curated conversion paths, and synced meta labels.
 
-`data:sync` refreshes patch-aware champion, augment, and Arena item data. `youtube:sync` incrementally catalogs King Nidhogg uploads and retrieves captions for the newest detailed videos. Both commands are safe to rerun.
+`data:sync` refreshes patch-aware champion, augment, and Arena item data. `youtube:sync` incrementally catalogs configured channel uploads and retrieves captions for the newest detailed videos. Both commands are safe to rerun.
 
 To ingest your own Arena history from Riot Match-v5, copy `.env.example` to `.env.local`, set `RIOT_API_KEY`, and run:
 
@@ -162,4 +162,4 @@ Valid objectives are `maxHealth`, `totalAttackDamage`, `abilityPower`, `abilityH
 
 Run `npm run lint`, `npm test`, `npm run build`, and `npm run test:ui` for verification. With the local server running, `npm run audit:recommendations` exhaustively checks every champion and every owned item/augment for ownership leaks, exact-champion leaks, and duplicate recommendations. The UI test uses an installed Microsoft Edge build in headless mode.
 
-Arena Build Lab is not endorsed by Riot Games and does not reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games and all associated properties are trademarks or registered trademarks of Riot Games, Inc.
+Arena Build Lab is an independent community tool. Use it as a reference and verify current game behavior in-client.

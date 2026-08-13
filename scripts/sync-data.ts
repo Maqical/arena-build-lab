@@ -58,7 +58,7 @@ const CURATED_COMBOS: CuratedCombo[] = [
     goals: ["health", "attack_damage", "on_hit", "stacking"],
     score: 99,
     evidenceUrl: "https://www.youtube.com/watch?v=A9DAzOXMdqo",
-    evidenceNote: "King Nidhogg: 660k Max HP Sion. Title evidence for Steel Your Heart + Tank Engine; captions confirm round-two Heartsteel, Overlord's, and the late-run tracker values.",
+    evidenceNote: "Video evidence: 660k Max HP Sion. Title evidence for Steel Your Heart + Tank Engine; captions confirm round-two Heartsteel, Overlord's, and the late-run tracker values.",
   },
   {
     slug: "mana-to-meat",
@@ -99,7 +99,7 @@ const CURATED_COMBOS: CuratedCombo[] = [
     goals: ["heal_shield", "attack_speed", "on_hit", "conversion"],
     score: 99,
     evidenceUrl: "https://www.youtube.com/watch?v=-UVNNepMryE",
-    evidenceNote: "King Nidhogg: Upgrade Sword of Blossoming + Circle of Death.",
+    evidenceNote: "Video evidence: Upgrade Sword of Blossoming + Circle of Death.",
   },
   {
     slug: "adapt-marksman-mage",

@@ -22,6 +22,7 @@
     "find-extreme": "tsx scripts/find_extreme_builds.ts",
     "meta:sync": "tsx scripts/sync_meta.ts",
     "meta:calculate": "tsx scripts/calculate_meta.ts",
+    "metasrc:discover": "tsx scripts/discover_metasrc_endpoints.ts",
     "riot:sync": "tsx scripts/riot-ingest.ts",
     "data:sync": "tsx scripts/sync-data.ts",
     "youtube:sync": ".venv\\Scripts\\python.exe workers/youtube_catalog.py --details-limit 20 --transcripts",

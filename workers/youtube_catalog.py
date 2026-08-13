@@ -16,8 +16,8 @@ from typing import Any
 from yt_dlp import YoutubeDL
 
 
-DEFAULT_CHANNEL = "https://www.youtube.com/@KingNidhogg/videos"
-CHANNEL_ID = "UCOpXSpY3_kbXHCODrg5ed5Q"
+DEFAULT_CHANNEL = os.environ.get("ARENA_VIDEO_CHANNEL", "")
+CHANNEL_ID = os.environ.get("ARENA_VIDEO_CHANNEL_ID", "")
 
 VIDEO_SCHEMA = """
 PRAGMA foreign_keys = ON;
@@ -75,7 +75,7 @@ ALIASES = {
 
 
 def arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Incrementally catalog and caption King Nidhogg Arena videos.")
+    parser = argparse.ArgumentParser(description="Incrementally catalog and caption Arena videos from a configured channel.")
     parser.add_argument("--channel", default=DEFAULT_CHANNEL)
     parser.add_argument("--database", default=os.environ.get("ARENA_DB_PATH", "data/arena.sqlite"))
     parser.add_argument("--limit", type=int, default=0, help="Limit the flat channel catalog; 0 means all uploads.")

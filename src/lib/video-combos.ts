@@ -100,7 +100,7 @@ export function rebuildVideoCombos(db: DatabaseSync, patch: string): number {
         JSON.stringify(goals),
         score,
         video.url,
-        "King Nidhogg title evidence matched against the current Arena entity catalog. Historical videos may use older balance values.",
+        "Video title evidence matched against the current Arena entity catalog. Historical videos may use older balance values.",
         patch,
       );
       count += 1;

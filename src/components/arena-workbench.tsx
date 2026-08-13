@@ -303,13 +303,13 @@ export function ArenaWorkbench({
           <div><strong>{overview.curatedCombos}</strong><span>verified chains</span></div>
           <div><strong>{overview.videoCombos}</strong><span>video build leads</span></div>
           <div><strong>{overview.discoveredCombos}</strong><span>mechanic leads</span></div>
-          <div><strong>{overview.videos}</strong><span>Nidhogg videos</span></div>
+          <div><strong>{overview.videos}</strong><span>video records</span></div>
         </section>
 
         <section className="results-heading">
           <div>
             <span className="eyebrow">{loading ? "Analyzing…" : `${resultCount} results shown`}</span>
-            <h2>{view === "combos" ? "Conversion paths" : view === "augment" ? "Augment database" : view === "item" ? "Arena item database" : "King Nidhogg evidence catalog"}</h2>
+            <h2>{view === "combos" ? "Conversion paths" : view === "augment" ? "Augment database" : view === "item" ? "Arena item database" : "Video evidence catalog"}</h2>
             {view === "combos" && selectedOwnedEntity && (
               <p className="anchor-note">Anchored to <strong>{selectedOwnedEntity.name}</strong> — every result contains what you already own.</p>
             )}
@@ -355,7 +355,7 @@ export function ArenaWorkbench({
         {view === "runs" && <RunTracker champions={champions} entityOptions={entityOptions} initialChampionKey={champion} />}
 
         <footer>
-          Arena Build Lab is not endorsed by Riot Games. Calculations and extracted evidence remain patch-stamped and auditable.
+            Arena Build Lab is an independent community tool. Calculations and extracted evidence remain patch-stamped and auditable.
         </footer>
       </section>
     </main>

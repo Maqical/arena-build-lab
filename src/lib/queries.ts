@@ -358,7 +358,7 @@ export function searchCombos(options: { query?: string; goal?: string; champion?
         return {
           ...combo,
           title: `${entities.map((entity) => entity.name).join(" + ")} (${combo.evidenceUrls.length} recorded runs)`,
-          summary: `This exact combination appears in ${combo.evidenceUrls.length} separate King Nidhogg Arena videos. The links are grouped here instead of repeating the same recommendation card.`,
+        summary: `This exact combination appears in ${combo.evidenceUrls.length} separate video records. The links are grouped here instead of repeating the same recommendation card.`,
           entities,
           score: combo.score + Math.min(combo.evidenceUrls.length - 1, 3),
         };
