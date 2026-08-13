@@ -1,13 +1,12 @@
-import { ArenaWorkbench } from "@/components/arena-workbench";
-import { getChampions, getEntityOptions, getOverview, getStatFormulas, searchCombos } from "@/lib/queries";
+import { Dashboard } from "@/components/Dashboard";
+import { getDatabase } from "@/lib/db";
+import { getMatchHistory, getTrophies } from "@/lib/history";
+import { getOverview } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
 export default function Home() {
-  const overview = getOverview();
-  const champions = getChampions();
-  const entityOptions = getEntityOptions();
-  const statFormulas = getStatFormulas();
-  const initialCombos = searchCombos({ curatedOnly: true, limit: 36 });
-  return <ArenaWorkbench overview={overview} champions={champions} entityOptions={entityOptions} statFormulas={statFormulas} initialCombos={initialCombos} />;
+  const db = getDatabase();
+  const count = (table: string) => Number(db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get()?.count ?? 0);
+  return <Dashboard data={{ overview: getOverview(), matches: getMatchHistory(5), trophies: getTrophies(3), warehouse: { matches: count("riot_matches"), participants: count("riot_participants"), observations: count("live_observations"), snapshots: count("meta_snapshots") } }} />;
 }

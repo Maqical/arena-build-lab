@@ -13,6 +13,7 @@ const OBS_MODE = process.argv.includes("--obs");
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 let serverProcess;
 let mainWindow;
+let dashboardWindow;
 let tray;
 let appearance = { opacity: 1, scale: 1 };
 let dataInitializing = false;
@@ -22,13 +23,13 @@ let boundsSaveTimer;
 const settingsPath = () => path.join(app.getPath("userData"), "user_settings.json");
 
 function defaultSettings() {
-  return { riotApiKey: process.env.RIOT_API_KEY || "", openAiApiKey: process.env.OPENAI_API_KEY || "", opacity: 1, scale: 1, openAtLogin: false, overlayBounds: null };
+  return { riotId: "", riotApiKey: process.env.RIOT_API_KEY || "", openAiApiKey: process.env.OPENAI_API_KEY || "", opacity: 1, scale: 1, openAtLogin: false, overlayBounds: null };
 }
 
 function readSettings() {
   try {
     const value = JSON.parse(fs.readFileSync(settingsPath(), "utf8"));
-    return { riotApiKey: String(value.riotApiKey ?? ""), openAiApiKey: String(value.openAiApiKey ?? ""), opacity: Number(value.opacity ?? 1), scale: Number(value.scale ?? 1), openAtLogin: Boolean(value.openAtLogin), overlayBounds: normalizedBounds(value.overlayBounds) };
+    return { riotId: String(value.riotId ?? ""), riotApiKey: String(value.riotApiKey ?? ""), openAiApiKey: String(value.openAiApiKey ?? ""), opacity: Number(value.opacity ?? 1), scale: Number(value.scale ?? 1), openAtLogin: Boolean(value.openAtLogin), overlayBounds: normalizedBounds(value.overlayBounds) };
   } catch { return defaultSettings(); }
 }
 
@@ -95,15 +96,18 @@ function packagedWorker(name) {
 
 function spawnWorker(worker) {
   const settings = readSettings();
-  const env = { ...process.env, RIOT_API_KEY: settings.riotApiKey, OPENAI_API_KEY: settings.openAiApiKey, ARENA_DB_PATH: path.join(app.getPath("userData"), "data", "arena.sqlite") };
+  const env = { ...process.env, RIOT_API_KEY: settings.riotApiKey, OPENAI_API_KEY: settings.openAiApiKey, ARENA_DB_PATH: path.join(app.getPath("userData"), "data", "arena.sqlite"), ARENA_EXTREME_CSV_PATH: rootPath("data", "extreme_builds.csv") };
   if (app.isPackaged) {
     if (worker === "youtube") return { child: spawn(packagedWorker("arena-youtube-sync.exe"), ["--database", env.ARENA_DB_PATH, "--details-limit", "20", "--transcripts"], { env, windowsHide: true, stdio: "ignore" }), exitEvent: "close" };
     const script = worker === "riot" ? packagedWorker("riot-sync.cjs") : packagedWorker("data-sync.cjs");
-    return { child: utilityProcess.fork(script, [], { env, cwd: app.getPath("userData"), stdio: "ignore", serviceName: `Arena ${worker} worker` }), exitEvent: "exit" };
+    const args = worker === "riot" && settings.riotId.trim() ? [`--player=${settings.riotId.trim()}`] : [];
+    return { child: utilityProcess.fork(script, args, { env, cwd: app.getPath("userData"), stdio: "ignore", serviceName: `Arena ${worker} worker` }), exitEvent: "exit" };
   }
   const command = worker === "youtube" ? "youtube:sync" : worker === "riot" ? "riot:sync" : "data:sync";
   const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-  return { child: spawn(npm, ["run", command], { cwd: path.resolve(__dirname, ".."), env, detached: true, stdio: "ignore", windowsHide: true }), exitEvent: "close" };
+  const args = ["run", command];
+  if (worker === "riot" && settings.riotId.trim()) args.push("--", `--player=${settings.riotId.trim()}`);
+  return { child: spawn(npm, args, { cwd: path.resolve(__dirname, ".."), env, detached: true, stdio: "ignore", windowsHide: true }), exitEvent: "close" };
 }
 
 function initializeDataIfNeeded() {
@@ -116,7 +120,7 @@ function initializeDataIfNeeded() {
 
 function startNext() {
   const settings = readSettings();
-  const env = { ...process.env, PORT: String(PORT), HOSTNAME: "127.0.0.1", ARENA_DB_PATH: prepareUserData(), NEXT_TELEMETRY_DISABLED: "1", RIOT_API_KEY: settings.riotApiKey, OPENAI_API_KEY: settings.openAiApiKey };
+  const env = { ...process.env, PORT: String(PORT), HOSTNAME: "127.0.0.1", ARENA_DB_PATH: prepareUserData(), ARENA_EXTREME_CSV_PATH: rootPath("data", "extreme_builds.csv"), NEXT_TELEMETRY_DISABLED: "1", RIOT_API_KEY: settings.riotApiKey, OPENAI_API_KEY: settings.openAiApiKey };
   if (app.isPackaged) {
     serverProcess = utilityProcess.fork(rootPath("standalone", "server.js"), [], { cwd: rootPath("standalone"), env, stdio: "ignore", serviceName: "Arena local server" });
   } else {
@@ -193,12 +197,39 @@ function createWindow() {
   });
 }
 
+function createDashboardWindow() {
+  dashboardWindow = new BrowserWindow({
+    width: 900,
+    height: 700,
+    minWidth: 760,
+    minHeight: 560,
+    show: false,
+    frame: true,
+    transparent: false,
+    alwaysOnTop: false,
+    resizable: true,
+    backgroundColor: "#090d14",
+    icon: appIconPath(),
+    webPreferences: { contextIsolation: true, nodeIntegration: false, preload: path.join(__dirname, "preload.cjs") },
+  });
+  dashboardWindow.setMenuBarVisibility(false);
+  dashboardWindow.on("close", (event) => {
+    if (!app.isQuitting) { event.preventDefault(); dashboardWindow.hide(); }
+  });
+  dashboardWindow.loadURL(`http://127.0.0.1:${PORT}/`);
+  dashboardWindow.once("ready-to-show", () => dashboardWindow?.show());
+}
+
+function openDashboard(route = "/") {
+  if (!dashboardWindow || dashboardWindow.isDestroyed()) return;
+  dashboardWindow.loadURL(`http://127.0.0.1:${PORT}${route}`);
+  if (dashboardWindow.isMinimized()) dashboardWindow.restore();
+  dashboardWindow.show();
+  dashboardWindow.focus();
+}
+
 function openSettings() {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  windowMode = "settings";
-  mainWindow.setResizable(true);
-  setWindowBounds({ ...mainWindow.getBounds(), width: 700, height: 760 });
-  mainWindow.loadURL(`http://127.0.0.1:${PORT}/settings`);
+  openDashboard("/settings");
 }
 
 function openOverlay() {
@@ -217,7 +248,8 @@ function createTray() {
   tray = new Tray(icon.resize({ width: 20, height: 20, quality: "best" }));
   tray.setToolTip("Arena Build Lab");
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: "Show overlay", click: () => mainWindow?.show() },
+    { label: "Open Dashboard", click: () => openDashboard() },
+    { label: "Show Overlay", click: openOverlay },
     { label: "Open Settings", click: openSettings },
     { label: "Reset Overlay Position", click: resetOverlayPosition },
     { label: "Launch at startup", type: "checkbox", checked: app.getLoginItemSettings().openAtLogin, click: (item) => app.setLoginItemSettings({ openAtLogin: item.checked }) },
@@ -225,7 +257,7 @@ function createTray() {
     { type: "separator" },
     { label: "Quit Arena Build Lab", click: () => { app.isQuitting = true; app.quit(); } },
   ]));
-  tray.on("double-click", () => mainWindow?.show());
+  tray.on("double-click", () => openDashboard());
 }
 
 ipcMain.handle("settings:get", () => readSettings());
@@ -258,10 +290,7 @@ ipcMain.handle("worker:run", (_event, worker) => {
 
 if (!hasSingleInstanceLock) app.quit();
 else app.on("second-instance", () => {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
-  if (mainWindow.isMinimized()) mainWindow.restore();
-  mainWindow.show();
-  mainWindow.focus();
+  openDashboard();
 });
 
 if (hasSingleInstanceLock) app.whenReady().then(async () => {
@@ -271,6 +300,7 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
   startNext();
   await waitForServer();
   createWindow();
+  createDashboardWindow();
   createTray();
   globalShortcut.register("CommandOrControl+Shift+A", () => void capturePicker());
   app.setLoginItemSettings({ openAtLogin: saved.openAtLogin });

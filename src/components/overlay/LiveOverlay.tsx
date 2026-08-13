@@ -37,13 +37,14 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 
 function phaseLabel(snapshot: GameStateSnapshot | null): string {
   if (!snapshot) return "Finding League";
+  const modeName = snapshot.mode === "aram_mayhem" ? "Mayhem" : "Arena";
   const labels: Record<GameStateSnapshot["phase"], string> = {
     disconnected: "League closed",
     idle: "Client ready",
-    arena_lobby: "Arena queue",
-    champ_select: "Arena champion select",
+    arena_lobby: `${modeName} queue`,
+    champ_select: `${modeName} champion select`,
     augment_select: "Choose an augment",
-    in_progress: "Arena live",
+    in_progress: `${modeName} live`,
     post_game: "Match complete",
   };
   return labels[snapshot.phase];
@@ -58,6 +59,8 @@ function demoSnapshot(entities: OverlayCatalogEntity[], champions: Champion[], p
     phase,
     rawPhase: phase === "champ_select" ? "ChampSelect" : "InProgress",
     isArena: true,
+    mode: "arena",
+    supportsAugments: true,
     queueId: 1740,
     queueName: "Arena demo",
     champion: { id: phase === "disconnected" ? null : sion?.id ?? 14, name: phase === "disconnected" ? "" : "Sion", level: phase === "champ_select" ? 1 : 18 },
@@ -78,6 +81,7 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
   const [snapshot, setSnapshot] = useState<GameStateSnapshot | null>(null);
   const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
   const [recommendation, setRecommendation] = useState<AIPickerResponse | null>(null);
+  const [scannedAugmentKeys, setScannedAugmentKeys] = useState<string[]>([]);
   const [liveBuild, setLiveBuild] = useState<LiveResolveResponse | null>(null);
   const [error, setError] = useState("");
   const [visible, setVisible] = useState(true);
@@ -101,16 +105,28 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
       .filter((entity): entity is OverlayCatalogEntity => entity?.kind === "augment"),
     [entityLookup, snapshot?.offeredAugmentRefs],
   );
-  const currentEntities = useMemo(
+  const detectedEntities = useMemo(
     () => (snapshot?.currentEntityRefs ?? [])
       .map((ref) => entityLookup.get(normalized(ref)))
       .filter((entity): entity is OverlayCatalogEntity => Boolean(entity)),
     [entityLookup, snapshot?.currentEntityRefs],
   );
+  const currentEntities = useMemo(() => {
+    const merged = new Map(detectedEntities.map((entity) => [entity.entityKey, entity]));
+    for (const key of scannedAugmentKeys) {
+      const entity = entityLookup.get(normalized(key));
+      if (entity?.kind === "augment") merged.set(entity.entityKey, entity);
+    }
+    return [...merged.values()];
+  }, [detectedEntities, entityLookup, scannedAugmentKeys]);
+  const unresolvedAugmentRefs = useMemo(
+    () => (snapshot?.currentEntityRefs ?? []).filter((ref) => !/^item:/i.test(ref) && !entityLookup.has(normalized(ref))),
+    [entityLookup, snapshot?.currentEntityRefs],
+  );
   const champion = useMemo(
     () => champions.find((candidate) => candidate.id === snapshot?.champion.id)
       ?? champions.find((candidate) => normalized(candidate.name) === normalized(snapshot?.champion.name ?? "")),
-    [champions, snapshot?.champion.id, snapshot?.champion.name],
+    [champions, snapshot?.champion],
   );
   const championMeta = champion ? metaLookup.get(`champion:${champion.key}`) : undefined;
   const championMetaPercent = championMeta?.winRate == null ? null : championMeta.sourceName === "riot_api_local" ? championMeta.winRate * 100 : championMeta.winRate;
@@ -134,6 +150,7 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
     const source = new EventSource("/api/lcu/status");
     source.addEventListener("state", (event) => {
       const next = JSON.parse((event as MessageEvent<string>).data) as GameStateSnapshot;
+      if (["disconnected", "idle", "post_game"].includes(next.phase)) setScannedAugmentKeys([]);
       setSnapshot(next);
       setConnectionState(next.connection.connected ? "live" : "retrying");
     });
@@ -166,7 +183,7 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
       level: snapshot.champion.level,
       currentEntityKeys: currentKeys,
       offeredAugmentKeys: offeredKeys,
-      opponent: "current Arena lobby",
+      opponent: snapshot.mode === "aram_mayhem" ? "current ARAM: Mayhem lobby" : "current Arena lobby",
       useAI: true,
     }).then((result) => { setRecommendation(result); setError(""); })
       .catch((caught) => setError(caught instanceof Error ? caught.message : String(caught)));
@@ -177,7 +194,7 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
   return (
     <section className="live-overlay">
       <header className="overlay-status">
-        <div><span className={`overlay-dot ${connectionState}`} /><div><strong>{phaseLabel(snapshot)}</strong><small>{snapshot?.isArena ? snapshot.queueName || "Arena detected" : snapshot?.connection.lastError || "Waiting for local client"}</small></div></div>
+        <div><span className={`overlay-dot ${connectionState}`} /><div><strong>{phaseLabel(snapshot)}</strong><small>{snapshot?.supportsAugments ? snapshot.queueName || (snapshot.mode === "aram_mayhem" ? "ARAM: Mayhem detected" : "Arena detected") : snapshot?.connection.lastError || "Waiting for supported mode"}</small></div></div>
         <div className="overlay-status-actions"><b>{snapshot?.connection.connected ? "LCU" : "OFF"}</b><button type="button" className="overlay-eye" aria-label={visible ? "Hide overlay details" : "Show overlay details"} onClick={() => setVisible((current) => !current)}>{visible ? "◉" : "◌"}</button></div>
       </header>
 
@@ -189,15 +206,15 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
 
       {visible && <>
 
-      {snapshot?.phase !== "disconnected" && <section className="overlay-champion">
+      {snapshot?.phase !== "disconnected" && snapshot?.supportsAugments && <section className="overlay-champion">
         {champion ? <Image src={champion.iconUrl} alt="" width={42} height={42} unoptimized /> : <div className="overlay-champion-placeholder">?</div>}
         <div><span>Level {snapshot?.champion.level ?? 1}</span><h1>{champion?.name || snapshot?.champion.name || "No champion"}</h1></div>
         {championMeta && <a href={championMeta.sourceUrl} target="_blank" rel="noreferrer"><strong>{championMetaPercent?.toFixed(1)}%</strong><span>{championMeta.sourceName === "riot_api_local" ? `Local WR · ${championMeta.sampleSize ?? 0} games` : `Meta WR · ${championMeta.tier}`}</span></a>}
       </section>}
 
-      {snapshot?.phase === "disconnected" ? null : snapshot?.phase === "arena_lobby" ? <LobbyScanner snapshot={snapshot} /> : snapshot?.phase === "champ_select" ? <ChampSelectAssistant champions={champions} snapshot={snapshot} compact /> : snapshot?.phase === "in_progress" ? <>
-        <LiveGameHUD snapshot={snapshot} build={liveBuild} augments={currentEntities.filter((entity) => entity.kind === "augment")} />
-        <ItemAssistant snapshot={snapshot} championId={champion?.id ?? snapshot.champion.id} augments={currentEntities.filter((entity) => entity.kind === "augment")} />
+      {snapshot?.phase === "disconnected" ? null : !snapshot?.supportsAugments ? <section className="overlay-idle-state"><span className="overlay-wait-pulse" /><strong>Waiting for Arena or ARAM: Mayhem…</strong><p>Open a supported queue and this companion will switch views automatically.</p></section> : snapshot?.phase === "arena_lobby" ? <LobbyScanner snapshot={snapshot} /> : snapshot?.phase === "champ_select" ? <ChampSelectAssistant champions={champions} snapshot={snapshot} compact /> : snapshot?.phase === "in_progress" ? <>
+        <LiveGameHUD snapshot={snapshot} build={liveBuild} augments={currentEntities.filter((entity) => entity.kind === "augment")} items={currentEntities.filter((entity) => entity.kind === "item")} unresolvedAugmentRefs={unresolvedAugmentRefs} />
+        <ItemAssistant championId={champion?.id ?? snapshot.champion.id} augments={currentEntities.filter((entity) => entity.kind === "augment")} />
         {recommendation?.screenshotExtracted && <section className="overlay-offers"><div className="overlay-section-title"><span>Screenshot offers</span><b>Ranked</b></div><div className="overlay-verdict"><span>AI pick</span><strong>{recommendation.recommendation.name}</strong><p>{recommendation.recommendation.rationale}</p></div></section>}
       </> : snapshot?.phase === "post_game" ? <PostGameAnalysis championName={snapshot.champion.name} /> : snapshot?.phase === "augment_select" || displayedOffers.length > 0 ? (
         <section className="overlay-offers">
@@ -226,14 +243,18 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
         </section>
       )}
 
-      {visible && snapshot?.phase !== "disconnected" && snapshot?.phase !== "post_game" && <ScreenshotPickerControl
+      {visible && snapshot?.supportsAugments && snapshot?.phase !== "disconnected" && snapshot?.phase !== "post_game" && <ScreenshotPickerControl
         championId={champion?.id ?? snapshot?.champion.id}
         level={snapshot?.champion.level ?? 18}
         currentEntityKeys={currentEntities.map((entity) => entity.entityKey)}
-        onResult={(result) => { setRecommendation(result); setError(""); }}
+        onResult={(result) => {
+          setRecommendation(result);
+          if (result.screenshotExtracted) setScannedAugmentKeys((current) => [...new Set([...current, result.recommendation.entityKey])]);
+          setError("");
+        }}
       />}
 
-      {visible && snapshot?.phase !== "disconnected" && snapshot?.phase !== "in_progress" && snapshot?.phase !== "post_game" && <section className="overlay-hud">
+      {visible && snapshot?.supportsAugments && snapshot?.phase !== "disconnected" && snapshot?.phase !== "in_progress" && snapshot?.phase !== "post_game" && <section className="overlay-hud">
         <div className="overlay-section-title"><span>Live stat tracker</span><b>{live ? "Live + theory" : "Theoretical"}</b></div>
         <div className="overlay-stat-grid">
           <div><span>Max HP</span><strong>{display(theory?.maxHealth)}</strong>{live && <small>game {display(live.maxHealth)}</small>}</div>

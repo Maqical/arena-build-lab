@@ -37,7 +37,7 @@ function matchingPaths(value: unknown): Array<{ path: string; value: unknown }> 
     if (typeof current !== "object") return;
     for (const [key, child] of Object.entries(current as JsonRecord)) {
       const childPath = `${currentPath}.${key}`;
-      if (/(augment|perk|rune|cherry)/i.test(key) || (typeof child === "string" && /(augment|perk|rune|cherry)/i.test(child))) {
+      if (/(augment|perk|rune|cherry|mayhem|card|kiwi)/i.test(key) || (typeof child === "string" && /(augment|perk|rune|cherry|mayhem|card|kiwi)/i.test(child))) {
         matches.push({ path: childPath, value: child });
       }
       visit(child, childPath, depth + 1);

@@ -514,7 +514,10 @@ async function main(): Promise<void> {
   const cdragonById = new Map(cdragonItems.map((item) => [integer(item.id), item]));
   const ddragonItems = record(ddragonItemsPayload.data);
   const items: ImportedEntity[] = Object.entries(ddragonItems)
-    .filter(([, value]) => record(record(value).maps)["30"] === true)
+    .filter(([, value]) => {
+      const maps = record(record(value).maps);
+      return maps["30"] === true || maps["12"] === true;
+    })
     .map(([idValue, value]) => {
       const ddragon = record(value);
       const id = integer(idValue);

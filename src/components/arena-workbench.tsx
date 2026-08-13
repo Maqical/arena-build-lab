@@ -212,11 +212,9 @@ export function ArenaWorkbench({
   const resultCount = view === "combos" ? combos.length : view === "videos" ? videos.length : entities.length;
 
   return (
-    <main className="shell">
-      <aside className="sidebar">
-        <div className="brand-mark">A</div>
-        <div className="brand-copy"><strong>Arena</strong><span>Build Lab</span></div>
-        <nav>
+    <main className="build-lab-page">
+      <section className="workspace">
+        <nav className="build-lab-tabs" aria-label="Build Lab sections">
           {([
             ["combos", "⌁", "Build paths"],
             ["augment", "✦", "Augments"],
@@ -229,18 +227,9 @@ export function ArenaWorkbench({
               <span>{icon}</span>{label}
             </button>
           ))}
-          <Link href="/ai-picker"><span>✦</span>AI draft picker</Link>
-          <Link href="/overlay"><span>◉</span>Live overlay</Link>
+          <Link href="/ai-picker"><span>✦</span>AI picker</Link>
           <Link href="/champ-select"><span>◈</span>Champion select</Link>
-          <Link href="/extreme-builds"><span>∞</span>Extreme builds</Link>
         </nav>
-        <div className="sidebar-status">
-          <span className="pulse" />
-          <div><strong>Patch {overview.patch}</strong><small>Local database online</small></div>
-        </div>
-      </aside>
-
-      <section className="workspace">
         <header className="topbar">
           <div>
             <span className="eyebrow">Patch-aware mechanics explorer</span>

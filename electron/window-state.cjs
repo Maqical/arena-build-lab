@@ -1,5 +1,7 @@
-const OVERLAY_BASE_WIDTH = 420;
+const OVERLAY_BASE_WIDTH = 450;
 const OVERLAY_BASE_HEIGHT = 720;
+const PREVIOUS_OVERLAY_BASE_WIDTH = 420;
+const PREVIOUS_OVERLAY_BASE_HEIGHT = 720;
 const LEGACY_OVERLAY_BASE_WIDTH = 300;
 const LEGACY_OVERLAY_BASE_HEIGHT = 600;
 
@@ -20,7 +22,11 @@ function defaultOverlayBounds(workArea, scale = 1) {
 function visibleOverlayBounds(saved, displays, scale = 1) {
   const primaryWorkArea = displays[0]?.workArea ?? { x: 0, y: 0, width: 1920, height: 1080 };
   const normalized = normalizedBounds(saved);
-  const candidate = normalized?.width === Math.round(LEGACY_OVERLAY_BASE_WIDTH * scale) && normalized.height === Math.round(LEGACY_OVERLAY_BASE_HEIGHT * scale)
+  const shouldMigrate = normalized && (
+    (normalized.width === Math.round(LEGACY_OVERLAY_BASE_WIDTH * scale) && normalized.height === Math.round(LEGACY_OVERLAY_BASE_HEIGHT * scale))
+    || (normalized.width === Math.round(PREVIOUS_OVERLAY_BASE_WIDTH * scale) && normalized.height === Math.round(PREVIOUS_OVERLAY_BASE_HEIGHT * scale))
+  );
+  const candidate = shouldMigrate
     ? { ...normalized, width: Math.round(OVERLAY_BASE_WIDTH * scale), height: Math.round(OVERLAY_BASE_HEIGHT * scale) }
     : normalized ?? defaultOverlayBounds(primaryWorkArea, scale);
   const display = displays.find(({ workArea }) => {

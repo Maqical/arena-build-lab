@@ -9,6 +9,7 @@ import { insertLiveObservation, mergeObservedMaxima } from "../src/lib/live-obse
 import { calculateMeta } from "../src/lib/meta-aggregation";
 import { cohortMembers, ingestCohortMember, insertParsedMatch, upsertCohortMember } from "../src/lib/riot/ingestion";
 import { parseRiotId, platformFromTagLine, RiotApiClient } from "../src/lib/riot/riot-api";
+import { RiotRequestQueue } from "../src/lib/riot/request-queue";
 import { SCHEMA_SQL } from "../src/lib/schema";
 import { queryBuildsForAugments } from "../src/lib/augment-build-query";
 
@@ -56,7 +57,23 @@ test("stores immutable matches once and never duplicates participants", () => {
   const build = queryBuildsForAugments(db, 14, [137000]);
   assert.equal(build.sampleSize, 1);
   assert.equal(build.lowSample, true);
-  assert.equal(build.items.find((item) => item.numericId === 3083)?.pickRate, 1);
+  assert.equal(build.source, "none");
+  assert.deepEqual(build.items, [], "a low-sample champion cohort must never leak observed or global items");
+  db.close();
+});
+
+test("falls back only to the same champion's extreme mechanical items", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec(SCHEMA_SQL);
+  db.prepare("INSERT INTO metadata(key,value,updated_at) VALUES ('patch','16.16.1','now')").run();
+  db.prepare("INSERT INTO champions(id,champion_key,name,title,partype,tags_json,stats_json,icon_url,patch) VALUES (14,'Sion','Sion','','','[]','{}','', '16.15')").run();
+  db.prepare(`INSERT INTO entities(entity_key,kind,numeric_id,api_name,name,rarity,description,tooltip,icon_url,purchasable,price,tags_json,produces_json,consumes_json,raw_json,patch,source_url)
+    VALUES ('item:447111','item',447111,'','Overlord''s Bloodmail','prismatic','','','bloodmail.png',1,4000,'[]','[]','[]','{}','16.15','fixture')`).run();
+  db.prepare(`INSERT INTO extreme_builds(champion_key,champion_name,level,objective,result_rank,score,theoretical_unbounded,unbounded_reason,status,stats_json,augment_keys_json,augments_json,scenario_name,scenario_json,iterations,delta,patch,generated_at)
+    VALUES ('Sion','Sion',18,'maxHealth',1,658207,0,'','converged','{}','["augment:137000"]','[{"key":"augment:137000","name":"Goliath","kind":"augment"},{"key":"item:447111","name":"Overlord''s Bloodmail","kind":"item"}]','fixture','{}',1,0,'16.15','now')`).run();
+  const build = queryBuildsForAugments(db, 14, [137000]);
+  assert.equal(build.source, "extreme");
+  assert.deepEqual(build.items.map((item) => item.numericId), [447111]);
   db.close();
 });
 
@@ -100,6 +117,32 @@ test("waits for Riot's Retry-After header and retries a 429 response", async () 
   assert.deepEqual(await client.requestJson("americas", "/test"), { ok: true });
   assert.equal(calls, 2);
   assert.deepEqual(waits, [2000]);
+});
+
+test("can enforce the crawler's strict 120-second 429 floor", async () => {
+  let calls = 0;
+  const waits: number[] = [];
+  const fakeFetch = async () => {
+    calls += 1;
+    if (calls === 1) return new Response("{}", { status: 429, headers: { "Retry-After": "2" } });
+    return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  const client = new RiotApiClient("test-key", fakeFetch, async (milliseconds) => { waits.push(milliseconds); }, Date.now, 120_000);
+  assert.deepEqual(await client.requestJson("americas", "/stress-test"), { ok: true });
+  assert.deepEqual(waits, [120_000]);
+});
+
+test("queues no more than the configured Riot request count per time window", async () => {
+  let now = 0;
+  const waits: number[] = [];
+  const calls: number[] = [];
+  const queue = new RiotRequestQueue(async () => {
+    calls.push(now);
+    return new Response("{}", { status: 200 });
+  }, 2, 120_000, async (milliseconds) => { waits.push(milliseconds); now += milliseconds; }, () => now);
+  await Promise.all([queue.fetch("https://example.test/1"), queue.fetch("https://example.test/2"), queue.fetch("https://example.test/3")]);
+  assert.deepEqual(calls, [0, 0, 120_000]);
+  assert.deepEqual(waits, [120_000]);
 });
 
 test("parses Riot IDs and infers common platform tags", () => {

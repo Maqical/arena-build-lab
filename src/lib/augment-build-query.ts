@@ -12,6 +12,7 @@ export type ConditionalItemRecommendation = {
   firstPlaceRate: number;
   topFourRate: number;
   averagePlacement: number | null;
+  reason: string;
 };
 
 export type AugmentBuildRecommendation = {
@@ -21,6 +22,8 @@ export type AugmentBuildRecommendation = {
   augmentNames: string[];
   sampleSize: number;
   lowSample: boolean;
+  source: "observed" | "extreme" | "none";
+  message: string;
   items: ConditionalItemRecommendation[];
 };
 
@@ -45,7 +48,7 @@ export function queryBuildsForAugments(db: DatabaseSync, championId: number, req
   const augmentNameById = new Map(augmentRows.map((row) => [Number(row.numeric_id), String(row.name)]));
 
   if (augmentIds.length === 0) {
-    return { championId, championName: String(champion?.name ?? championId), augmentIds, augmentNames: [], sampleSize: 0, lowSample: true, items: [] };
+    return { championId, championName: String(champion?.name ?? championId), augmentIds, augmentNames: [], sampleSize: 0, lowSample: true, source: "none", message: "Choose or scan an augment to enable localized recommendations.", items: [] };
   }
 
   const participantRows = db.prepare(`
@@ -74,7 +77,7 @@ export function queryBuildsForAugments(db: DatabaseSync, championId: number, req
 
   const entityRows = aggregates.size === 0 ? [] : db.prepare(`
     SELECT numeric_id, entity_key, name, icon_url FROM entities
-    WHERE kind='item' AND purchasable=1 AND price>0
+    WHERE kind='item' AND purchasable=1 AND price>500
       AND numeric_id IN (${[...aggregates].map(() => "?").join(",")})
   `).all(...aggregates.keys()) as Row[];
   const entityById = new Map(entityRows.map((row) => [Number(row.numeric_id), row]));
@@ -92,18 +95,64 @@ export function queryBuildsForAugments(db: DatabaseSync, championId: number, req
       firstPlaceRate: aggregate.games === 0 ? 0 : aggregate.firsts / aggregate.games,
       topFourRate: aggregate.games === 0 ? 0 : aggregate.topFours / aggregate.games,
       averagePlacement: aggregate.placementCount === 0 ? null : aggregate.placementTotal / aggregate.placementCount,
+      reason: `Observed with this champion and exact augment set in ${aggregate.games} local matches.`,
     };
   }).filter((item): item is ConditionalItemRecommendation => Boolean(item))
     .sort((left, right) => right.pickRate - left.pickRate || right.topFourRate - left.topFourRate || right.games - left.games)
     .slice(0, Math.max(1, Math.min(10, limit)));
 
-  return {
+  if (sampleSize >= 20) return {
     championId,
     championName: String(champion?.name ?? championId),
     augmentIds,
     augmentNames: augmentIds.map((id) => augmentNameById.get(id) ?? `Augment ${id}`),
     sampleSize,
-    lowSample: sampleSize < 20,
+    lowSample: false,
+    source: "observed",
+    message: `Localized recommendation from ${sampleSize} matching champion + augment games.`,
     items,
+  };
+
+  const championName = String(champion?.name ?? championId);
+  const extremeRows = db.prepare(`
+    SELECT score, augments_json FROM extreme_builds
+    WHERE lower(champion_name)=lower(?)
+    ORDER BY generated_at DESC, score DESC LIMIT 100
+  `).all(championName) as Row[];
+  const requested = new Set(augmentIds);
+  const candidates = extremeRows.map((row) => {
+    const effects = (() => { try { const value = JSON.parse(String(row.augments_json ?? "[]")); return Array.isArray(value) ? value as Row[] : []; } catch { return []; } })();
+    const matches = effects.filter((effect) => String(effect.kind) === "augment" && requested.has(Number(String(effect.key ?? "").replace(/^augment:/i, "")))).length;
+    return { score: Number(row.score ?? 0), matches, effects };
+  }).sort((left, right) => right.matches - left.matches || right.score - left.score);
+  const extreme = candidates.find((candidate) => candidate.effects.some((effect) => String(effect.kind) === "item"));
+  const fallbackItems = (extreme?.effects.filter((effect) => String(effect.kind) === "item") ?? []).flatMap((effect) => {
+    const key = String(effect.key ?? "");
+    const name = String(effect.name ?? "");
+    const entity = db.prepare(`
+      SELECT entity_key, numeric_id, name, icon_url FROM entities
+      WHERE kind='item' AND (entity_key=? OR lower(name)=lower(?))
+      ORDER BY purchasable DESC, price DESC LIMIT 1
+    `).get(key, name) as Row | undefined;
+    if (!entity) return [];
+    return [{
+      entityKey: String(entity.entity_key), numericId: Number(entity.numeric_id), name: String(entity.name), iconUrl: String(entity.icon_url),
+      games: 0, pickRate: 0, firstPlaceRate: 0, topFourRate: 0, averagePlacement: null,
+      reason: `Champion-specific mechanical fallback from ${championName}'s extreme-build model.`,
+    } satisfies ConditionalItemRecommendation];
+  }).slice(0, Math.max(1, Math.min(10, limit)));
+
+  return {
+    championId,
+    championName,
+    augmentIds,
+    augmentNames: augmentIds.map((id) => augmentNameById.get(id) ?? `Augment ${id}`),
+    sampleSize,
+    lowSample: true,
+    source: fallbackItems.length > 0 ? "extreme" : "none",
+    message: fallbackItems.length > 0
+      ? `Fewer than 20 localized games; showing only ${championName}'s mechanical extreme-build items.`
+      : "No localized data. Sync matches to enable recommendations.",
+    items: fallbackItems,
   };
 }

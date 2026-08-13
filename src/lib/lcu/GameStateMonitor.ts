@@ -6,6 +6,7 @@ import { mergeObservedMaxima, type LiveObservationInput } from "@/lib/live-obser
 type UnknownRecord = Record<string, unknown>;
 
 export type ArenaGamePhase = "disconnected" | "idle" | "arena_lobby" | "champ_select" | "augment_select" | "in_progress" | "post_game";
+export type CompanionGameMode = "arena" | "aram_mayhem" | null;
 
 export type LiveChampionStats = {
   currentHealth: number;
@@ -25,10 +26,12 @@ export type GameStateSnapshot = {
   phase: ArenaGamePhase;
   rawPhase: string;
   isArena: boolean;
+  mode: CompanionGameMode;
+  supportsAugments: boolean;
   queueId: number | null;
   queueName: string;
   champion: { id: number | null; name: string; level: number };
-  lobbyMembers: Array<{ puuid: string; gameName: string; tagLine: string }>;
+  lobbyMembers: Array<{ puuid: string; gameName: string; tagLine: string; rank?: string }>;
   currentEntityRefs: string[];
   offeredAugmentRefs: string[];
   liveStats: LiveChampionStats | null;
@@ -83,7 +86,7 @@ function normalizedAugmentRef(value: unknown): string | null {
   }
   const object = record(value);
   if (!object) return null;
-  for (const key of ["augmentId", "id", "perkId", "numericId", "apiName", "name"]) {
+  for (const key of ["augmentId", "cardId", "id", "perkId", "numericId", "apiName", "name"]) {
     const result = normalizedAugmentRef(object[key]);
     if (result) return result;
   }
@@ -96,8 +99,8 @@ function unique(values: Array<string | null>): string[] {
 
 /** Conservative extractor for current/future LCU payloads that explicitly name a three-option augment offer. */
 export function extractOfferedAugmentRefs(uri: string, data: unknown): string[] {
-  if (!/(augment|cherry|perk)/i.test(uri)) return [];
-  if (Array.isArray(data) && data.length === 3 && /(augment|perk).*(offer|option|choice|select)|(offer|option|choice|select).*(augment|perk)/i.test(uri)) {
+  if (!/(augment|cherry|perk|mayhem|card|kiwi)/i.test(uri)) return [];
+  if (Array.isArray(data) && data.length === 3 && /(augment|perk|card|mayhem).*(offer|option|choice|select)|(offer|option|choice|select).*(augment|perk|card|mayhem)/i.test(uri)) {
     const directRefs = unique(data.map(normalizedAugmentRef));
     if (directRefs.length === 3) return directRefs;
   }
@@ -107,7 +110,7 @@ export function extractOfferedAugmentRefs(uri: string, data: unknown): string[] 
     const object = record(value);
     if (!object) return;
     for (const [key, child] of Object.entries(object)) {
-      if (Array.isArray(child) && child.length === 3 && /(augment.*(offer|option|choice)|(?:offer|option|choice).*augment|offeredAugments|augmentChoices|augmentOptions)/i.test(key)) {
+      if (Array.isArray(child) && child.length === 3 && /((?:augment|card|perk).*(?:offer|option|choice)|(?:offer|option|choice).*(?:augment|card|perk)|offeredAugments|augmentChoices|augmentOptions|offeredCards|cardChoices|cardOptions)/i.test(key)) {
         const refs = unique(child.map(normalizedAugmentRef));
         if (refs.length === 3) candidates.push(refs);
       }
@@ -141,14 +144,14 @@ export function extractOwnedAugmentRefs(liveData: unknown): string[] {
     const spellAugment = augmentNameFromSpell(value);
     if (spellAugment) output.push(spellAugment);
     if (Array.isArray(value)) {
-      if (/(augment|generalRunes|selectedPerks|perkIds)/i.test(keyPath)) output.push(...value.map(normalizedAugmentRef).filter((entry): entry is string => Boolean(entry)));
+      if (/(augment|generalRunes|selectedPerks|perkIds|mayhem|card)/i.test(keyPath)) output.push(...value.map(normalizedAugmentRef).filter((entry): entry is string => Boolean(entry)));
       value.forEach((entry, index) => visit(entry, `${keyPath}.${index}`, depth + 1));
       return;
     }
     const object = record(value);
     if (!object) return;
     for (const [key, child] of Object.entries(object)) {
-      if (/(?:^|_)(augmentId|selectedAugment|ownedAugment|perkId)$/i.test(key) && !Array.isArray(child) && !record(child)) {
+      if (/(?:^|_)(augmentId|selectedAugment|ownedAugment|perkId|cardId|selectedCard|ownedCard)$/i.test(key) && !Array.isArray(child) && !record(child)) {
         output.push(normalizedAugmentRef(child) ?? "");
       }
       visit(child, `${keyPath}.${key}`, depth + 1);
@@ -161,15 +164,29 @@ export function extractOwnedAugmentRefs(liveData: unknown): string[] {
   return unique(output);
 }
 
-function itemRefsFromLiveData(liveData: UnknownRecord): string[] {
-  const active = record(liveData.activePlayer);
-  const allPlayers = Array.isArray(liveData.allPlayers) ? liveData.allPlayers.map(record).filter((entry): entry is UnknownRecord => Boolean(entry)) : [];
+const NON_BUILD_ITEM_IDS = new Set([
+  2003, 2010, 2011, 2012, 2031, 2033, 2052, 2055,
+  2138, 2139, 2140, 2141, 2142, 2143, 2144,
+  3340, 3341, 3363, 3364, 3513,
+]);
+
+export function extractTrackableItemRefs(liveData: unknown): string[] {
+  const liveRecord = record(liveData);
+  if (!liveRecord) return [];
+  const active = record(liveRecord.activePlayer);
+  const allPlayers = Array.isArray(liveRecord.allPlayers) ? liveRecord.allPlayers.map(record).filter((entry): entry is UnknownRecord => Boolean(entry)) : [];
   const activeName = String(active?.summonerName ?? active?.riotId ?? "");
   const player = allPlayers.find((entry) => String(entry.summonerName ?? entry.riotId ?? "") === activeName) ?? allPlayers.find((entry) => entry.isActivePlayer === true);
   if (!player || !Array.isArray(player.items)) return [];
   return unique(player.items.map((item) => {
     const entry = record(item);
     const id = Number(entry?.itemID ?? entry?.itemId ?? entry?.id ?? 0);
+    const name = String(entry?.displayName ?? entry?.name ?? "");
+    const price = finite(entry?.price);
+    const slot = Math.trunc(finite(entry?.slot));
+    const isUtilitySlot = slot >= 6;
+    const isConsumable = entry?.consumable === true || /(?:biscuit|poro[- ]?snax|potion|elixir|ward|trinket)/i.test(name);
+    if (NON_BUILD_ITEM_IDS.has(id) || isUtilitySlot || isConsumable || price <= 500) return null;
     return Number.isInteger(id) && id > 0 ? `item:${id}` : null;
   }));
 }
@@ -222,7 +239,18 @@ function lobbyMembers(lobby: UnknownRecord | null, champSelect: ChampSelectSessi
   return [...members.values()];
 }
 
-function arenaDetails(session: GameflowSession | null, lobby: UnknownRecord | null): { isArena: boolean; queueId: number | null; queueName: string } {
+function rankedLabel(payload: unknown): string {
+  const root = record(payload);
+  const queueMap = record(root?.queueMap);
+  const queue = record(queueMap?.RANKED_SOLO_5x5) ?? record(queueMap?.RANKED_FLEX_SR);
+  const queues = Array.isArray(root?.queues) ? root.queues.map(record).filter((entry): entry is UnknownRecord => Boolean(entry)) : [];
+  const ranked = queue ?? queues.find((entry) => /RANKED_SOLO_5x5|RANKED_FLEX_SR/.test(String(entry.queueType ?? entry.queueTypeName ?? "")));
+  const tier = String(ranked?.tier ?? "").trim();
+  const division = String(ranked?.division ?? ranked?.rank ?? "").trim();
+  return tier && tier.toUpperCase() !== "NA" ? `${tier[0].toUpperCase()}${tier.slice(1).toLowerCase()}${division ? ` ${division}` : ""}` : "Unranked";
+}
+
+function gameDetails(session: GameflowSession | null, lobby: UnknownRecord | null): { isArena: boolean; queueId: number | null; queueName: string } {
   const map = record(session?.map);
   const gameData = record(session?.gameData);
   const queue = record(gameData?.queue) ?? record(record(lobby?.gameConfig)?.queue);
@@ -237,14 +265,20 @@ function arenaDetails(session: GameflowSession | null, lobby: UnknownRecord | nu
   };
 }
 
-function normalizedPhase(rawPhase: string, isArena: boolean, offers: readonly string[], liveAvailable: boolean): ArenaGamePhase {
+export function companionMode(details: { isArena: boolean; queueId: number | null; queueName: string; liveGameMode?: string }): CompanionGameMode {
+  if (details.isArena) return "arena";
+  if (details.queueId === 2400 || /ARAM\s*:?\s*Mayhem/i.test(details.queueName) || /ARAM.*Mayhem|Mayhem.*ARAM|KIWI/i.test(details.liveGameMode ?? "")) return "aram_mayhem";
+  return null;
+}
+
+function normalizedPhase(rawPhase: string, supportsAugments: boolean, offers: readonly string[], liveAvailable: boolean): ArenaGamePhase {
   if (offers.length === 3) return "augment_select";
   if (liveAvailable || rawPhase === "InProgress") return "in_progress";
-  if (rawPhase === "ChampSelect" && isArena) return "champ_select";
-  if (["Lobby", "Matchmaking", "ReadyCheck"].includes(rawPhase) && isArena) return "arena_lobby";
+  if (rawPhase === "ChampSelect" && supportsAugments) return "champ_select";
+  if (["Lobby", "Matchmaking", "ReadyCheck"].includes(rawPhase) && supportsAugments) return "arena_lobby";
   if (["WaitingForStats", "PreEndOfGame", "EndOfGame"].includes(rawPhase)) return "post_game";
   if (!rawPhase || rawPhase === "None") return "idle";
-  return isArena ? "arena_lobby" : "idle";
+  return supportsAugments ? "arena_lobby" : "idle";
 }
 
 async function liveClientData(): Promise<UnknownRecord | null> {
@@ -278,12 +312,15 @@ export class GameStateMonitor extends EventEmitter {
   private selectedAugments = new Set<string>();
   private observedCandidateUris = new Set<string>();
   private liveObservation: LiveObservationInput | null = null;
+  private readonly rankCache = new Map<string, { rank: string; expiresAt: number }>();
   private snapshotValue: GameStateSnapshot = {
     sequence: 0,
     connection: EMPTY_CONNECTION,
     phase: "disconnected",
     rawPhase: "",
     isArena: false,
+    mode: null,
+    supportsAugments: false,
     queueId: null,
     queueName: "",
     champion: { id: null, name: "", level: 1 },
@@ -291,7 +328,7 @@ export class GameStateMonitor extends EventEmitter {
     currentEntityRefs: [],
     offeredAugmentRefs: [],
     liveStats: null,
-    offerFeed: { status: "waiting", sourceUri: "", detectedAt: "", note: "Waiting for an Arena session.", observedCandidateUris: [] },
+    offerFeed: { status: "waiting", sourceUri: "", detectedAt: "", note: "Waiting for Arena or ARAM: Mayhem.", observedCandidateUris: [] },
     updatedAt: new Date().toISOString(),
   };
 
@@ -331,7 +368,7 @@ export class GameStateMonitor extends EventEmitter {
   }
 
   private onLcuEvent(event: LcuJsonApiEvent): void {
-    if (/(augment|cherry|perk)/i.test(event.uri)) {
+    if (/(augment|cherry|perk|mayhem|card|kiwi)/i.test(event.uri)) {
       this.observedCandidateUris.add(event.uri);
       while (this.observedCandidateUris.size > 12) this.observedCandidateUris.delete(this.observedCandidateUris.values().next().value ?? "");
     }
@@ -339,11 +376,24 @@ export class GameStateMonitor extends EventEmitter {
     if (offers.length === 3) {
       this.offers = { refs: offers, sourceUri: event.uri, detectedAt: new Date().toISOString(), expiresAt: Date.now() + 90_000 };
     }
-    if (/(augment|cherry|perk)/i.test(event.uri) && !/(catalog|game-data\/assets)/i.test(event.uri)) {
+    if (/(augment|cherry|perk|mayhem|card|kiwi)/i.test(event.uri) && !/(catalog|game-data\/assets)/i.test(event.uri)) {
       const selected = extractOwnedAugmentRefs({ arena: event.data });
       if (selected.length > 0 && selected.length <= 4) selected.forEach((reference) => this.selectedAugments.add(reference));
     }
     void this.refresh();
+  }
+
+  private async enrichLobbyMembers(members: GameStateSnapshot["lobbyMembers"], connected: boolean): Promise<GameStateSnapshot["lobbyMembers"]> {
+    if (!connected || members.length === 0) return members;
+    return Promise.all(members.map(async (member) => {
+      if (!member.puuid) return { ...member, rank: "Unranked" };
+      const cached = this.rankCache.get(member.puuid);
+      if (cached && cached.expiresAt > Date.now()) return { ...member, rank: cached.rank };
+      const payload = await safeLcu<UnknownRecord>(this.connector, `/lol-ranked/v1/ranked-stats/${encodeURIComponent(member.puuid)}`);
+      const rank = payload ? rankedLabel(payload) : "Unranked";
+      this.rankCache.set(member.puuid, { rank, expiresAt: Date.now() + 5 * 60_000 });
+      return { ...member, rank };
+    }));
   }
 
   private async refresh(): Promise<void> {
@@ -359,21 +409,24 @@ export class GameStateMonitor extends EventEmitter {
         liveClientData(),
       ]);
       const rawPhase = String(rawPhaseValue ?? session?.phase ?? (live ? "InProgress" : ""));
-      const arena = arenaDetails(session, lobby);
+      const details = gameDetails(session, lobby);
       const livePlayer = live ? liveChampion(live) : { name: "", level: 1, stats: null };
       const gameMode = String(record(live?.gameData)?.gameMode ?? record(live?.gameData)?.mapName ?? "");
-      const isArena = arena.isArena || (Boolean(live) && /(CHERRY|Arena|Map30)/i.test(gameMode));
-      if (!isArena || ["Lobby", "Matchmaking", "ReadyCheck", "ChampSelect"].includes(rawPhase)) this.selectedAugments.clear();
-      if (this.offers && (Date.now() > this.offers.expiresAt || !isArena)) this.offers = null;
+      const isArena = details.isArena || (Boolean(live) && /(CHERRY|Arena|Map30)/i.test(gameMode));
+      const mode = companionMode({ ...details, isArena, liveGameMode: gameMode });
+      const supportsAugments = mode !== null;
+      if (!supportsAugments || ["Lobby", "Matchmaking", "ReadyCheck", "ChampSelect"].includes(rawPhase)) this.selectedAugments.clear();
+      if (this.offers && (Date.now() > this.offers.expiresAt || !supportsAugments)) this.offers = null;
       const liveAugments = live ? extractOwnedAugmentRefs(live) : [];
       liveAugments.forEach((reference) => this.selectedAugments.add(reference));
-      const currentEntityRefs = live ? unique([...itemRefsFromLiveData(live), ...this.selectedAugments]) : [...this.selectedAugments];
+      const currentEntityRefs = live ? unique([...extractTrackableItemRefs(live), ...this.selectedAugments]) : [...this.selectedAugments];
       if (this.offers && this.offers.refs.some((offer) => currentEntityRefs.includes(offer))) this.offers = null;
       const offeredAugmentRefs = this.offers?.refs ?? [];
-      const phase = normalizedPhase(rawPhase, isArena, offeredAugmentRefs, Boolean(live));
+      const phase = normalizedPhase(rawPhase, supportsAugments, offeredAugmentRefs, Boolean(live));
+      const members = await this.enrichLobbyMembers(lobbyMembers(lobby, champSelect), connection.connected);
       const championId = livePlayer.name ? null : championFromSelect(champSelect);
-      const offerStatus = offeredAugmentRefs.length === 3 ? "detected" : isArena && phase === "in_progress" ? "not_exposed" : "waiting";
-      if (isArena && livePlayer.stats) {
+      const offerStatus = offeredAugmentRefs.length === 3 ? "detected" : supportsAugments && phase === "in_progress" ? "not_exposed" : "waiting";
+      if (supportsAugments && livePlayer.stats) {
         const previous = this.liveObservation;
         this.liveObservation = {
           championId: previous?.championId ?? this.snapshotValue.champion.id,
@@ -383,11 +436,11 @@ export class GameStateMonitor extends EventEmitter {
             ...currentEntityRefs.filter((reference) => !/^item:/i.test(reference)),
           ]),
           maxima: mergeObservedMaxima(previous?.maxima ?? null, livePlayer.stats),
-          queueId: arena.queueId ?? previous?.queueId ?? this.snapshotValue.queueId,
+          queueId: details.queueId ?? previous?.queueId ?? this.snapshotValue.queueId,
           startedAt: previous?.startedAt ?? new Date().toISOString(),
           endedAt: new Date().toISOString(),
           source: "live_client",
-          extra: { gameMode: gameMode || "CHERRY" },
+          extra: { gameMode: gameMode || (mode === "aram_mayhem" ? "ARAM: Mayhem" : "CHERRY"), companionMode: mode },
         };
       }
       const completedObservation = this.liveObservation && this.snapshotValue.phase === "in_progress" && phase !== "in_progress"
@@ -401,10 +454,12 @@ export class GameStateMonitor extends EventEmitter {
         phase: connection.connected || live ? phase : "disconnected",
         rawPhase,
         isArena,
-        queueId: arena.queueId,
-        queueName: arena.queueName,
+        mode,
+        supportsAugments,
+        queueId: details.queueId,
+        queueName: details.queueName,
         champion: { id: championId, name: livePlayer.name, level: livePlayer.level },
-        lobbyMembers: lobbyMembers(lobby, champSelect),
+        lobbyMembers: members,
         currentEntityRefs,
         offeredAugmentRefs,
         liveStats: livePlayer.stats,
@@ -415,7 +470,7 @@ export class GameStateMonitor extends EventEmitter {
           note: offerStatus === "detected"
             ? "Three augment offers were read from a local client event."
             : offerStatus === "not_exposed"
-              ? "The published LCU and Live Client schemas do not expose Arena's three current offers. Candidate client events are still monitored."
+              ? `The published local-client schemas did not expose this ${mode === "aram_mayhem" ? "Mayhem" : "Arena"} offer. Candidate events are still monitored.`
               : "Waiting for an in-game augment offer event.",
           observedCandidateUris: [...this.observedCandidateUris],
         },

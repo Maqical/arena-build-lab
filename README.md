@@ -1,6 +1,6 @@
 # Arena Build Lab
 
-Local-first League of Legends Arena reference, evidence catalog, stat-conversion calculator, personal match journal, and build-combination explorer. It combines current structured game data with an auditable stat producer/consumer graph and optional video evidence.
+Local-first Arena and ARAM: Mayhem companion with a live overlay, recursive stat-conversion engine, AI-assisted augment picker, personal match history, and an immutable local data warehouse.
 
 ## Start
 
@@ -17,11 +17,11 @@ Open <http://localhost:3000>.
 
 The live draft picker is at <http://localhost:3000/ai-picker>. Manual three-option comparisons always run locally. To enable screenshot reading and the optional two-sentence AI recommendation, copy `.env.example` to `.env.local`, set `OPENAI_API_KEY`, and optionally change `OPENAI_PICKER_MODEL`.
 
-The live companion is at <http://localhost:3000/overlay>. Open it as a 300x600 browser window on a second monitor. It discovers the running League Client lockfile, follows Arena lobby/champion-select/in-game transitions over the local LCU event stream, and reads current champion stats and items from Riot's local Live Client Data API. The overlay sends detected state into the existing resolver and AI picker; no process injection, memory reading, or automated game input is used. Add `?demo=1` to preview augment selection or `?demo=champ-select` to preview Champion Select without running League.
+The live companion is at <http://localhost:3000/overlay>. Open it as a 450x720 browser window on a second monitor. It discovers the running League Client lockfile, follows Arena lobby/champion-select/in-game transitions over the local LCU event stream, and reads current champion stats and items from the local Live Client Data API. The overlay sends detected state into the existing resolver and AI picker; no process injection, memory reading, or automated game input is used. Add `?demo=1` to preview augment selection or `?demo=champ-select` to preview Champion Select without running League.
 
 ## Desktop distribution
 
-Run `npm run electron:build` on Windows to produce `dist/Arena-Build-Lab-1.0.0-Setup.exe`. The installer launches the existing Next production server locally, opens the 300×600 frameless overlay, keeps it in the system tray when closed, and offers a startup toggle. Open Settings from the tray to save API keys, adjust opacity/scale, or launch data workers. `Ctrl+Shift+A` is registered at the desktop-shell level: it captures the primary display into the clipboard and invokes the existing screenshot augment picker. Pass `--obs` to the Electron entrypoint for a chroma-green OBS window (`electron electron/main.cjs --obs`).
+Run `npm run electron:build` on Windows to produce `dist/Arena-Build-Lab-1.0.0-Setup.exe`. The installer launches the existing Next production server locally, opens the 450x720 frameless overlay, keeps it in the system tray when closed, and offers a startup toggle. Open Settings from the tray to save API keys, adjust opacity/scale, or launch data workers. `Ctrl+Shift+A` is registered at the desktop-shell level: it captures the primary display into the clipboard and invokes the existing screenshot augment picker. Pass `--obs` to the Electron entrypoint for a chroma-green OBS window (`electron electron/main.cjs --obs`).
 
 ### Download & install
 
@@ -107,7 +107,7 @@ npm run youtube:link
 
 The LCU surface is locally available but unsupported for third-party applications. Before distributing a public companion, register the product through Riot's developer portal and revalidate the local endpoints after League patches. If lockfile discovery cannot locate a custom install, set `LEAGUE_LOCKFILE_PATH` in `.env.local`.
 
-Web pages cannot register an operating-system-global shortcut, force themselves always-on-top, or capture another application silently. `Ctrl+Shift+A` therefore works while the 300x600 overlay window is focused and reads only an image the user explicitly copied to the clipboard. The adjacent **Image** button is the permission-free file fallback. Screenshot contents go to the configured OpenAI vision endpoint only after one of those user actions; live stats and manual choices remain local.
+The desktop shell registers `Ctrl+Shift+A` globally and captures the primary display only after that explicit user action. In a normal browser, paste a user-captured image or use the adjacent **Image** button instead. Screenshot contents go to the configured OpenAI vision endpoint only after one of those user actions; live stats and manual choices remain local.
 
 The copied extreme-build text is a readable loadout plan for notes/chat. League currently has no Arena-augment import schema, so the app does not claim those plans are native client item-set imports.
 

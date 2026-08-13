@@ -18,8 +18,7 @@ logs/lcu_dump*.json
 .env*
 !.env.example
 tests/fixtures/*.local.json
-qa/*.png
-qa/*.log
+qa/
 __pycache__/
 *.py[cod]
 .DS_Store

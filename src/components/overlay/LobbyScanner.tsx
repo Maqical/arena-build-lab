@@ -35,7 +35,7 @@ export function LobbyScanner({ snapshot }: { snapshot: GameStateSnapshot }) {
         <article key={member.puuid || `${member.gameName}#${member.tagLine}`}>
           <div>
             <strong>{member.gameName}{member.tagLine ? `#${member.tagLine}` : ""}</strong>
-            <span>{member.mostPlayed.map((champion) => champion.championName).join(" · ") || "No local history"}</span>
+            <span>{member.rank || "Unranked"} · {member.mostPlayed.map((champion) => champion.championName).join(" · ") || "No local history"}</span>
           </div>
           <dl>
             <div><dt>Games</dt><dd>{member.games}</dd></div>

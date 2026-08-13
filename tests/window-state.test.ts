@@ -16,11 +16,15 @@ test("restores exact overlay bounds when they remain visible", () => {
 });
 
 test("moves an off-screen overlay back onto the primary display", () => {
-  assert.deepEqual(visibleOverlayBounds({ x: 9000, y: 9000, width: 420, height: 720 }, displays), { x: 1476, y: 160, width: 420, height: 720 });
+  assert.deepEqual(visibleOverlayBounds({ x: 9000, y: 9000, width: 450, height: 720 }, displays), { x: 1446, y: 160, width: 450, height: 720 });
 });
 
 test("migrates the legacy 300x600 overlay while preserving its position", () => {
-  assert.deepEqual(visibleOverlayBounds({ x: 100, y: 120, width: 300, height: 600 }, displays), { x: 100, y: 120, width: 420, height: 720 });
+  assert.deepEqual(visibleOverlayBounds({ x: 100, y: 120, width: 300, height: 600 }, displays), { x: 100, y: 120, width: 450, height: 720 });
+});
+
+test("migrates the previous 420x720 overlay to the readable width", () => {
+  assert.deepEqual(visibleOverlayBounds({ x: 100, y: 120, width: 420, height: 720 }, displays), { x: 100, y: 120, width: 450, height: 720 });
 });
 
 test("rejects malformed or unusably small persisted bounds", () => {

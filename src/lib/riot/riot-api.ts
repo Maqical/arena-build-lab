@@ -96,6 +96,7 @@ export class RiotApiClient {
     private readonly fetchImpl: FetchLike = fetch,
     private readonly sleep: Sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
     private readonly now: () => number = Date.now,
+    private readonly minimum429DelayMs = 0,
   ) {
     if (!apiKey.trim()) throw new Error("RIOT_API_KEY is required.");
   }
@@ -138,7 +139,8 @@ export class RiotApiClient {
       }
       const retryAfter = Number(response.headers.get("Retry-After"));
       const exponentialMs = Math.min(30_000, 500 * 2 ** attempt);
-      const delayMs = Number.isFinite(retryAfter) && retryAfter >= 0 ? retryAfter * 1_000 : exponentialMs;
+      const serverDelayMs = Number.isFinite(retryAfter) && retryAfter >= 0 ? retryAfter * 1_000 : exponentialMs;
+      const delayMs = response.status === 429 ? Math.max(serverDelayMs, this.minimum429DelayMs) : serverDelayMs;
       await this.sleep(delayMs);
       if (response.status === 429) this.windows = [];
     }

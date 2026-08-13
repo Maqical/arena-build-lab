@@ -23,7 +23,17 @@ try {
     if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`);
   });
 
-  await page.goto("http://localhost:3000", { waitUntil: "networkidle" });
+  await page.goto("http://localhost:3000/", { waitUntil: "domcontentloaded" });
+  await page.getByRole("heading", { name: "Your command center", exact: true }).waitFor();
+  await page.locator('.desktop-sidebar[aria-label="Primary navigation"]').waitFor();
+  await page.screenshot({ path: path.join(output, "dashboard.png"), fullPage: true });
+
+  await page.goto("http://localhost:3000/settings", { waitUntil: "domcontentloaded" });
+  await page.getByRole("heading", { name: "Settings", exact: true }).waitFor();
+  await page.getByText("v1.0.0", { exact: true }).waitFor();
+  await page.screenshot({ path: path.join(output, "settings.png"), fullPage: true });
+
+  await page.goto("http://localhost:3000/build-lab", { waitUntil: "domcontentloaded" });
   await page.getByText("Conversion paths", { exact: true }).waitFor();
   const desktopCombos = await page.locator(".combo-card").count();
   assert(desktopCombos >= 9);
@@ -63,7 +73,7 @@ try {
 
   const ownedPage = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
   ownedPage.on("pageerror", (error) => errors.push(error.message));
-  await ownedPage.goto("http://localhost:3000", { waitUntil: "networkidle" });
+  await ownedPage.goto("http://localhost:3000/build-lab", { waitUntil: "domcontentloaded" });
   await ownedPage.locator("#champion").selectOption("Yunara");
   await ownedPage.locator("#owned-entity").selectOption("item:443069");
   await ownedPage.getByText("Hamstringer + Vulnerability (3 recorded runs)", { exact: true }).waitFor();
@@ -108,7 +118,7 @@ try {
 
   const mobilePage = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
   mobilePage.on("pageerror", (error) => errors.push(error.message));
-  await mobilePage.goto("http://localhost:3000", { waitUntil: "networkidle" });
+  await mobilePage.goto("http://localhost:3000/build-lab", { waitUntil: "domcontentloaded" });
   await mobilePage.getByText("Conversion paths", { exact: true }).waitFor();
   const mobileDimensions = await mobilePage.evaluate(() => ({
     viewport: window.innerWidth,
@@ -117,7 +127,7 @@ try {
   assert(mobileDimensions.document <= mobileDimensions.viewport);
   await mobilePage.screenshot({ path: path.join(output, "mobile.png"), fullPage: true });
 
-  const overlayPage = await browser.newPage({ viewport: { width: 420, height: 720 }, deviceScaleFactor: 1 });
+  const overlayPage = await browser.newPage({ viewport: { width: 450, height: 720 }, deviceScaleFactor: 1 });
   overlayPage.on("pageerror", (error) => errors.push(error.message));
   overlayPage.on("response", (response) => {
     if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`);
@@ -140,12 +150,12 @@ try {
     component: Math.round(document.querySelector(".overlay-page")?.getBoundingClientRect().width ?? 0),
   }));
   assert(overlayDimensions.document <= overlayDimensions.viewport);
-  assert(overlayDimensions.component <= 420);
+  assert(overlayDimensions.component <= 450);
   await overlayPage.screenshot({ path: path.join(output, "live-overlay-demo.png"), fullPage: true });
 
   const extremePage = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
   extremePage.on("pageerror", (error) => errors.push(error.message));
-  await extremePage.goto("http://localhost:3000/extreme-builds", { waitUntil: "networkidle" });
+  await extremePage.goto("http://localhost:3000/extreme-builds", { waitUntil: "domcontentloaded" });
   await extremePage.getByRole("heading", { name: "Extreme Build Browser", exact: true }).waitFor();
   await extremePage.getByLabel("Champion filter").selectOption({ label: "Sion" });
   await extremePage.getByText("658,207", { exact: true }).first().waitFor();
@@ -167,7 +177,7 @@ try {
   assert(await championSelectPage.locator(".champ-picks article").count() >= 4);
   await championSelectPage.screenshot({ path: path.join(output, "champ-select-assistant.png"), fullPage: true });
 
-  const champOverlayPage = await browser.newPage({ viewport: { width: 420, height: 720 }, deviceScaleFactor: 1 });
+  const champOverlayPage = await browser.newPage({ viewport: { width: 450, height: 720 }, deviceScaleFactor: 1 });
   champOverlayPage.on("pageerror", (error) => errors.push(error.message));
   await champOverlayPage.goto("http://localhost:3000/overlay?demo=champ-select", { waitUntil: "domcontentloaded" });
   await champOverlayPage.getByText("Live Arena hover / lock", { exact: true }).waitFor();
@@ -175,13 +185,13 @@ try {
   assert.equal(await champOverlayPage.getByRole("button", { name: /Paste augment snip/ }).count(), 1);
   await champOverlayPage.screenshot({ path: path.join(output, "champ-select-overlay.png"), fullPage: true });
 
-  const disconnectedPage = await browser.newPage({ viewport: { width: 420, height: 720 }, deviceScaleFactor: 1 });
+  const disconnectedPage = await browser.newPage({ viewport: { width: 450, height: 720 }, deviceScaleFactor: 1 });
   disconnectedPage.on("pageerror", (error) => errors.push(error.message));
   await disconnectedPage.goto("http://localhost:3000/overlay?demo=disconnected", { waitUntil: "domcontentloaded" });
   await disconnectedPage.getByText("Waiting for League Client…", { exact: true }).waitFor();
   assert.equal(await disconnectedPage.locator(".overlay-connection-wait").count(), 1);
 
-  const hotkeyPage = await browser.newPage({ viewport: { width: 420, height: 720 }, deviceScaleFactor: 1 });
+  const hotkeyPage = await browser.newPage({ viewport: { width: 450, height: 720 }, deviceScaleFactor: 1 });
   await hotkeyPage.addInitScript(() => {
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { read: async () => [{ types: ["image/png"], getType: async () => new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" }) }] } });
   });
