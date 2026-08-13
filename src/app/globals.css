@@ -379,6 +379,37 @@ footer { color: #5f5868; font-size: 10px; text-align: center; margin-top: 42px; 
 .overlay-post-game strong { color: #f4edf8; font-size: 18px; }
 .overlay-post-game p { color: #a79baa; font-size: 11px; line-height: 1.4; }
 .overlay-post-game a { color: #c3a6f2; font-size: 11px; }
+.live-overlay > section, .overlay-status { background: linear-gradient(145deg, rgba(16, 27, 43, .78), rgba(10, 17, 29, .86)); border-color: rgba(111, 203, 255, .18); box-shadow: 0 12px 34px rgba(0,0,0,.22); backdrop-filter: blur(16px); }
+.extreme-build-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; overflow: visible; border: 0; background: transparent; }
+.extreme-build-card { display: flex; flex-direction: column; gap: 13px; min-width: 0; padding: 17px; border: 1px solid rgba(104, 210, 255, .16); border-radius: 16px; background: radial-gradient(circle at 100% 0, rgba(43, 142, 193, .16), transparent 42%), linear-gradient(145deg, rgba(19, 32, 51, .96), rgba(11, 19, 32, .98)); box-shadow: 0 14px 34px rgba(0,0,0,.22); transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
+.extreme-build-card:hover { transform: translateY(-4px); border-color: rgba(104, 210, 255, .48); box-shadow: 0 18px 42px rgba(0,0,0,.36), 0 0 28px rgba(54, 189, 247, .08); }
+.build-card-head { display: flex; justify-content: space-between; align-items: center; }
+.build-card-level { color: #7f9bb3; font: 10px var(--font-geist-mono), monospace; }
+.build-card-augments { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.build-card-augments span { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 0; color: #d7c5ff; text-align: center; }
+.build-card-augments img { border: 1px solid rgba(239, 196, 90, .55); border-radius: 8px; box-shadow: 0 0 12px rgba(239,196,90,.15); }
+.build-card-augments em { overflow: hidden; width: 100%; color: #a99abf; font-size: 8px; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
+.build-card-augments span:hover em { overflow: visible; position: absolute; z-index: 2; top: 37px; width: max-content; max-width: 170px; padding: 5px 7px; border: 1px solid #6ad8ff; border-radius: 5px; background: #122338; color: #f5fbff; white-space: normal; }
+.build-card-augments span:hover em { pointer-events: none; }
+.build-card-craze > div { display: flex; justify-content: space-between; color: #8aa5bd; font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
+.build-card-craze strong { color: #62ddff; font-family: var(--font-geist-mono), monospace; }
+.build-card-craze i { display: block; height: 5px; margin-top: 6px; overflow: hidden; border-radius: 9px; background: #15283a; }
+.build-card-craze i b { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #27b9e9, #8b7dff, #f1c65e); box-shadow: 0 0 12px rgba(80, 214, 255, .5); }
+.build-card-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.build-card-stats div { padding: 8px 5px; border: 1px solid rgba(255,255,255,.06); border-radius: 8px; background: rgba(5, 12, 22, .48); text-align: center; }
+.build-card-stats span { display: block; color: #7692a9; font: 8px var(--font-geist-mono), monospace; }
+.build-card-stats strong { display: block; margin-top: 3px; color: #65e2ff; font: 12px var(--font-geist-mono), monospace; }
+.build-card-stats div:first-child strong { color: #76f0ac; }
+.build-card-items { margin: 0; overflow: hidden; color: #9bacc0; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.extreme-build-card .copy-build { width: 100%; border-radius: 8px; background: rgba(83, 180, 231, .1); }
+.extreme-build-card .copy-build { position: relative; z-index: 3; }
+.history-card { background: linear-gradient(110deg, rgba(17, 31, 48, .94), rgba(12, 21, 34, .96)); border-color: rgba(104, 210, 255, .15); box-shadow: 0 8px 22px rgba(0,0,0,.15); }
+.history-card.crazy { border-color: rgba(241, 198, 94, .6); box-shadow: 0 0 22px rgba(241, 198, 94, .08); }
+.history-augments span { border-color: rgba(104, 210, 255, .2); background: rgba(50, 143, 183, .12); }
+.trophy-card { border-color: rgba(241, 198, 94, .48); background: radial-gradient(circle at 0 0, rgba(241,198,94,.2), transparent 42%), linear-gradient(135deg, rgba(35, 30, 43, .96), rgba(15, 22, 35, .98)); box-shadow: 0 0 26px rgba(241,198,94,.1), inset 0 0 25px rgba(241,198,94,.03); transition: transform .2s ease, box-shadow .2s ease; }
+.trophy-card:hover { transform: translateY(-4px); box-shadow: 0 0 38px rgba(241,198,94,.22), inset 0 0 25px rgba(241,198,94,.08); }
+.trophy-copy strong { color: #ffe08a; text-shadow: 0 0 16px rgba(241,198,94,.3); }
+@media (max-width: 760px) { .extreme-build-grid { grid-template-columns: 1fr; } }
 .settings-shell { max-width: 900px; margin: 0 auto; padding: 42px 24px 70px; }
 .settings-shell > header { margin-bottom: 22px; }
 .settings-card { margin: 14px 0; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: rgba(20, 15, 28, .92); }
