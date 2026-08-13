@@ -21,7 +21,7 @@ The live companion is at <http://localhost:3000/overlay>. Open it as a 300x600 b
 
 ## Desktop distribution
 
-Run `npm run electron:build` on Windows to produce `dist/Arena-Build-Lab-0.9.0-Setup.exe`. The installer launches the existing Next production server locally, opens the 300×600 frameless overlay, keeps it in the system tray when closed, and offers a startup toggle. `Ctrl+Shift+A` is registered at the desktop-shell level: it captures the primary display into the clipboard and invokes the existing screenshot augment picker. Pass `--obs` to the Electron entrypoint for a chroma-green OBS window (`electron electron/main.cjs --obs`).
+Run `npm run electron:build` on Windows to produce `dist/Arena-Build-Lab-1.0.0-Setup.exe`. The installer launches the existing Next production server locally, opens the 300×600 frameless overlay, keeps it in the system tray when closed, and offers a startup toggle. Open Settings from the tray to save API keys, adjust opacity/scale, or launch data workers. `Ctrl+Shift+A` is registered at the desktop-shell level: it captures the primary display into the clipboard and invokes the existing screenshot augment picker. Pass `--obs` to the Electron entrypoint for a chroma-green OBS window (`electron electron/main.cjs --obs`).
 
 The mathematical build table is at <http://localhost:3000/extreme-builds>. It loads `data/extreme_builds.csv` on the server and provides champion/objective/search filters, HP/AD/AP/AS sorting, scenario-aware stats, and copyable build plans. The live Champion Select dashboard is at <http://localhost:3000/champ-select>; it follows the same LCU stream and combines the hovered champion with local extreme builds, curated conversion paths, and synced meta labels.
 

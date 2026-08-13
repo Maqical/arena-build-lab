@@ -379,6 +379,22 @@ footer { color: #5f5868; font-size: 10px; text-align: center; margin-top: 42px; 
 .overlay-post-game strong { color: #f4edf8; font-size: 18px; }
 .overlay-post-game p { color: #a79baa; font-size: 11px; line-height: 1.4; }
 .overlay-post-game a { color: #c3a6f2; font-size: 11px; }
+.settings-shell { max-width: 900px; margin: 0 auto; padding: 42px 24px 70px; }
+.settings-shell > header { margin-bottom: 22px; }
+.settings-card { margin: 14px 0; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: rgba(20, 15, 28, .92); }
+.settings-card h2 { margin: 0 0 12px; color: #f2eaf7; font-size: 16px; }
+.settings-card p { color: #a79baa; font-size: 12px; line-height: 1.5; }
+.settings-card label { display: block; margin: 12px 0; color: #bdb1c4; font-size: 12px; }
+.settings-card input[type="password"] { display: block; width: 100%; margin-top: 6px; padding: 10px; color: #f3edf7; background: #100d17; border: 1px solid #46384d; border-radius: 7px; }
+.settings-card input[type="range"] { display: block; width: 100%; margin-top: 8px; accent-color: #bc91eb; }
+.settings-card output { float: right; color: #e1b7ff; font-family: var(--font-geist-mono), monospace; }
+.settings-card button { padding: 9px 12px; color: #eee5f4; background: #241b2d; border: 1px solid #5a4567; border-radius: 7px; cursor: pointer; }
+.settings-card button:hover { background: #32233e; }
+.settings-card button:disabled { cursor: not-allowed; opacity: .45; }
+.settings-primary { color: #130d19 !important; background: #c79bea !important; border-color: #c79bea !important; }
+.settings-actions { display: flex; flex-wrap: wrap; gap: 9px; }
+.settings-status { color: #75dca4 !important; }
+.settings-warning { padding: 11px 13px; color: #f1c26f; background: #2d2113; border: 1px solid #644a25; border-radius: 8px; font-size: 12px; }
 .overlay-offers dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; margin: 0; }
 .overlay-offers dl div { display: flex; flex-direction: column; align-items: flex-end; }
 .overlay-offers dt { color: #716879; font-size: 6px; }
