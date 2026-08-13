@@ -117,7 +117,7 @@ try {
   assert(mobileDimensions.document <= mobileDimensions.viewport);
   await mobilePage.screenshot({ path: path.join(output, "mobile.png"), fullPage: true });
 
-  const overlayPage = await browser.newPage({ viewport: { width: 300, height: 600 }, deviceScaleFactor: 1 });
+  const overlayPage = await browser.newPage({ viewport: { width: 420, height: 720 }, deviceScaleFactor: 1 });
   overlayPage.on("pageerror", (error) => errors.push(error.message));
   overlayPage.on("response", (response) => {
     if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`);
@@ -140,7 +140,7 @@ try {
     component: Math.round(document.querySelector(".overlay-page")?.getBoundingClientRect().width ?? 0),
   }));
   assert(overlayDimensions.document <= overlayDimensions.viewport);
-  assert(overlayDimensions.component <= 300);
+  assert(overlayDimensions.component <= 420);
   await overlayPage.screenshot({ path: path.join(output, "live-overlay-demo.png"), fullPage: true });
 
   const extremePage = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
@@ -167,7 +167,7 @@ try {
   assert(await championSelectPage.locator(".champ-picks article").count() >= 4);
   await championSelectPage.screenshot({ path: path.join(output, "champ-select-assistant.png"), fullPage: true });
 
-  const champOverlayPage = await browser.newPage({ viewport: { width: 300, height: 600 }, deviceScaleFactor: 1 });
+  const champOverlayPage = await browser.newPage({ viewport: { width: 420, height: 720 }, deviceScaleFactor: 1 });
   champOverlayPage.on("pageerror", (error) => errors.push(error.message));
   await champOverlayPage.goto("http://localhost:3000/overlay?demo=champ-select", { waitUntil: "domcontentloaded" });
   await champOverlayPage.getByText("Live Arena hover / lock", { exact: true }).waitFor();
@@ -175,13 +175,13 @@ try {
   assert.equal(await champOverlayPage.getByRole("button", { name: /Paste augment snip/ }).count(), 1);
   await champOverlayPage.screenshot({ path: path.join(output, "champ-select-overlay.png"), fullPage: true });
 
-  const disconnectedPage = await browser.newPage({ viewport: { width: 300, height: 600 }, deviceScaleFactor: 1 });
+  const disconnectedPage = await browser.newPage({ viewport: { width: 420, height: 720 }, deviceScaleFactor: 1 });
   disconnectedPage.on("pageerror", (error) => errors.push(error.message));
   await disconnectedPage.goto("http://localhost:3000/overlay?demo=disconnected", { waitUntil: "domcontentloaded" });
   await disconnectedPage.getByText("Waiting for League Client…", { exact: true }).waitFor();
   assert.equal(await disconnectedPage.locator(".overlay-connection-wait").count(), 1);
 
-  const hotkeyPage = await browser.newPage({ viewport: { width: 300, height: 600 }, deviceScaleFactor: 1 });
+  const hotkeyPage = await browser.newPage({ viewport: { width: 420, height: 720 }, deviceScaleFactor: 1 });
   await hotkeyPage.addInitScript(() => {
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { read: async () => [{ types: ["image/png"], getType: async () => new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" }) }] } });
   });

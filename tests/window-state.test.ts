@@ -11,12 +11,16 @@ const { normalizedBounds, visibleOverlayBounds } = require("../electron/window-s
 const displays = [{ workArea: { x: 0, y: 0, width: 1920, height: 1040 } }, { workArea: { x: 1920, y: 0, width: 2560, height: 1400 } }];
 
 test("restores exact overlay bounds when they remain visible", () => {
-  const saved = { x: 2200, y: 180, width: 375, height: 750 };
+  const saved = { x: 2200, y: 180, width: 500, height: 800 };
   assert.deepEqual(visibleOverlayBounds(saved, displays, 1.25), saved);
 });
 
 test("moves an off-screen overlay back onto the primary display", () => {
-  assert.deepEqual(visibleOverlayBounds({ x: 9000, y: 9000, width: 300, height: 600 }, displays), { x: 1596, y: 220, width: 300, height: 600 });
+  assert.deepEqual(visibleOverlayBounds({ x: 9000, y: 9000, width: 420, height: 720 }, displays), { x: 1476, y: 160, width: 420, height: 720 });
+});
+
+test("migrates the legacy 300x600 overlay while preserving its position", () => {
+  assert.deepEqual(visibleOverlayBounds({ x: 100, y: 120, width: 300, height: 600 }, displays), { x: 100, y: 120, width: 420, height: 720 });
 });
 
 test("rejects malformed or unusably small persisted bounds", () => {

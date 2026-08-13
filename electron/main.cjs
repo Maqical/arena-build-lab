@@ -4,7 +4,7 @@ const { spawn } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 const http = require("node:http");
-const { normalizedBounds, defaultOverlayBounds: makeDefaultOverlayBounds, visibleOverlayBounds: restoreVisibleBounds } = require("./window-state.cjs");
+const { OVERLAY_BASE_WIDTH, OVERLAY_BASE_HEIGHT, normalizedBounds, defaultOverlayBounds: makeDefaultOverlayBounds, visibleOverlayBounds: restoreVisibleBounds } = require("./window-state.cjs");
 
 app.setName("Arena Build Lab");
 
@@ -76,6 +76,10 @@ function resetOverlayPosition() {
 
 function rootPath(...parts) { return path.join(app.isPackaged ? process.resourcesPath : path.resolve(__dirname, ".."), ...parts); }
 
+function appIconPath() {
+  return rootPath("assets", "arena-build-lab.png");
+}
+
 function prepareUserData() {
   const destination = path.join(app.getPath("userData"), "data");
   fs.mkdirSync(destination, { recursive: true });
@@ -132,7 +136,7 @@ function applyAppearance(next, resizeWindow = true) {
     mainWindow.setOpacity(appearance.opacity);
     if (resizeWindow && windowMode === "overlay") {
       const bounds = mainWindow.getBounds();
-      setWindowBounds({ ...bounds, width: Math.round(300 * appearance.scale), height: Math.round(600 * appearance.scale) });
+      setWindowBounds({ ...bounds, width: Math.round(OVERLAY_BASE_WIDTH * appearance.scale), height: Math.round(OVERLAY_BASE_HEIGHT * appearance.scale) });
     }
     if (windowMode === "overlay") writeSettings({ opacity: appearance.opacity, scale: appearance.scale, overlayBounds: mainWindow.getBounds() });
     void mainWindow.webContents.executeJavaScript(`document.documentElement.style.zoom = ${appearance.scale}`);
@@ -172,6 +176,7 @@ function createWindow() {
     ...initialBounds, minWidth: 225, minHeight: 300,
     frame: false, transparent: OBS_MODE, alwaysOnTop: !OBS_MODE, resizable: false,
     backgroundColor: OBS_MODE ? "#00FF00" : "#100d17",
+    icon: appIconPath(),
     webPreferences: { contextIsolation: true, nodeIntegration: false, preload: path.join(__dirname, "preload.cjs") },
   });
   mainWindow.setMenuBarVisibility(false);
@@ -200,14 +205,16 @@ function openOverlay() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   windowMode = "overlay";
   mainWindow.setResizable(false);
-  setWindowBounds({ ...mainWindow.getBounds(), width: Math.round(300 * appearance.scale), height: Math.round(600 * appearance.scale) });
+  setWindowBounds({ ...mainWindow.getBounds(), width: Math.round(OVERLAY_BASE_WIDTH * appearance.scale), height: Math.round(OVERLAY_BASE_HEIGHT * appearance.scale) });
   persistOverlayBoundsSoon();
   mainWindow.loadURL(`http://127.0.0.1:${PORT}/overlay${OBS_MODE ? "?obs=1" : ""}`);
   mainWindow.show();
 }
 
 function createTray() {
-  tray = new Tray(nativeImage.createEmpty());
+  const icon = nativeImage.createFromPath(appIconPath());
+  if (icon.isEmpty()) throw new Error(`Tray icon is missing or invalid: ${appIconPath()}`);
+  tray = new Tray(icon.resize({ width: 20, height: 20, quality: "best" }));
   tray.setToolTip("Arena Build Lab");
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: "Show overlay", click: () => mainWindow?.show() },

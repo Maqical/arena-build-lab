@@ -124,18 +124,40 @@ export function extractOfferedAugmentRefs(uri: string, data: unknown): string[] 
 /** Extracts selected augment-like references from documented or observed Live Client shapes. */
 export function extractOwnedAugmentRefs(liveData: unknown): string[] {
   const output: string[] = [];
+  const root = record(liveData);
+  const active = record(root?.activePlayer);
+  const activeName = String(active?.summonerName ?? active?.riotId ?? "");
+  const players = Array.isArray(root?.allPlayers) ? root.allPlayers.map(record).filter((entry): entry is UnknownRecord => Boolean(entry)) : [];
+  const player = players.find((entry) => String(entry.summonerName ?? entry.riotId ?? "") === activeName)
+    ?? players.find((entry) => entry.isActivePlayer === true);
+
+  const augmentNameFromSpell = (value: unknown): string | null => {
+    if (typeof value !== "string") return null;
+    const match = value.match(/(?:^|_)Augment_([A-Za-z0-9]+)(?:_|$)/i);
+    return match?.[1] ?? null;
+  };
   const visit = (value: unknown, keyPath: string, depth: number) => {
     if (depth > 8 || value == null) return;
+    const spellAugment = augmentNameFromSpell(value);
+    if (spellAugment) output.push(spellAugment);
     if (Array.isArray(value)) {
-      if (/(augment|generalRunes)/i.test(keyPath)) output.push(...value.map(normalizedAugmentRef).filter((entry): entry is string => Boolean(entry)));
+      if (/(augment|generalRunes|selectedPerks|perkIds)/i.test(keyPath)) output.push(...value.map(normalizedAugmentRef).filter((entry): entry is string => Boolean(entry)));
       value.forEach((entry, index) => visit(entry, `${keyPath}.${index}`, depth + 1));
       return;
     }
     const object = record(value);
     if (!object) return;
-    for (const [key, child] of Object.entries(object)) visit(child, `${keyPath}.${key}`, depth + 1);
+    for (const [key, child] of Object.entries(object)) {
+      if (/(?:^|_)(augmentId|selectedAugment|ownedAugment|perkId)$/i.test(key) && !Array.isArray(child) && !record(child)) {
+        output.push(normalizedAugmentRef(child) ?? "");
+      }
+      visit(child, `${keyPath}.${key}`, depth + 1);
+    }
   };
-  visit(liveData, "root", 0);
+  if (active) visit(active, "activePlayer", 0);
+  if (player) visit(player, "activePlayerRecord", 0);
+  if (root?.arena) visit(root.arena, "arena", 0);
+  if (root?.augments) visit(root.augments, "augments", 0);
   return unique(output);
 }
 
@@ -253,6 +275,7 @@ export class GameStateMonitor extends EventEmitter {
   private refreshing = false;
   private sequence = 0;
   private offers: { refs: string[]; sourceUri: string; detectedAt: string; expiresAt: number } | null = null;
+  private selectedAugments = new Set<string>();
   private observedCandidateUris = new Set<string>();
   private liveObservation: LiveObservationInput | null = null;
   private snapshotValue: GameStateSnapshot = {
@@ -316,6 +339,10 @@ export class GameStateMonitor extends EventEmitter {
     if (offers.length === 3) {
       this.offers = { refs: offers, sourceUri: event.uri, detectedAt: new Date().toISOString(), expiresAt: Date.now() + 90_000 };
     }
+    if (/(augment|cherry|perk)/i.test(event.uri) && !/(catalog|game-data\/assets)/i.test(event.uri)) {
+      const selected = extractOwnedAugmentRefs({ arena: event.data });
+      if (selected.length > 0 && selected.length <= 4) selected.forEach((reference) => this.selectedAugments.add(reference));
+    }
     void this.refresh();
   }
 
@@ -336,8 +363,11 @@ export class GameStateMonitor extends EventEmitter {
       const livePlayer = live ? liveChampion(live) : { name: "", level: 1, stats: null };
       const gameMode = String(record(live?.gameData)?.gameMode ?? record(live?.gameData)?.mapName ?? "");
       const isArena = arena.isArena || (Boolean(live) && /(CHERRY|Arena|Map30)/i.test(gameMode));
+      if (!isArena || ["Lobby", "Matchmaking", "ReadyCheck", "ChampSelect"].includes(rawPhase)) this.selectedAugments.clear();
       if (this.offers && (Date.now() > this.offers.expiresAt || !isArena)) this.offers = null;
-      const currentEntityRefs = live ? unique([...itemRefsFromLiveData(live), ...extractOwnedAugmentRefs(live)]) : [];
+      const liveAugments = live ? extractOwnedAugmentRefs(live) : [];
+      liveAugments.forEach((reference) => this.selectedAugments.add(reference));
+      const currentEntityRefs = live ? unique([...itemRefsFromLiveData(live), ...this.selectedAugments]) : [...this.selectedAugments];
       if (this.offers && this.offers.refs.some((offer) => currentEntityRefs.includes(offer))) this.offers = null;
       const offeredAugmentRefs = this.offers?.refs ?? [];
       const phase = normalizedPhase(rawPhase, isArena, offeredAugmentRefs, Boolean(live));

@@ -315,9 +315,9 @@ footer { color: #5f5868; font-size: 10px; text-align: center; margin-top: 42px; 
 .delta-grid em { color: #716879; font-style: normal; }
 .delta-grid .changed em { color: #6ee5a7; }
 
-/* 300x600 companion window. Keep this section self-contained so the main lab
+/* 420x720 companion window. Keep this section self-contained so the main lab
    remains comfortable at desktop widths. */
-.overlay-page { width: min(300px, 100vw); min-height: 100vh; margin: 0 auto; padding: 7px; background: #09070e; }
+.overlay-page { width: min(420px, 100vw); min-height: 100vh; margin: 0 auto; padding: 9px; background: #09070e; }
 .overlay-topline { display: flex; align-items: center; justify-content: space-between; padding: 3px 3px 8px; color: #766d81; font-size: 8px; letter-spacing: .04em; text-transform: uppercase; }
 .overlay-topline a { color: var(--violet-bright); text-decoration: none; font-weight: 700; }
 .live-overlay { display: flex; flex-direction: column; gap: 7px; }
@@ -355,12 +355,12 @@ footer { color: #5f5868; font-size: 10px; text-align: center; margin-top: 42px; 
 .overlay-eye { border: 1px solid #493d55; background: #171321; color: #c8bdd2; border-radius: 6px; width: 25px; height: 24px; cursor: pointer; }
 .overlay-hidden-note { margin: 12px; padding: 12px; color: #b8aec0; background: #171321; border-radius: 8px; text-align: center; }
 .overlay-hidden-note button { margin-left: 6px; color: #b99be8; border: 0; background: transparent; cursor: pointer; }
-.live-game-hud, .item-assistant, .overlay-post-game { margin: 10px 12px; padding: 10px; border: 1px solid var(--line); border-radius: 9px; background: linear-gradient(145deg, #191424, #100d17); }
+.live-game-hud, .item-assistant, .overlay-post-game { margin: 8px 10px; padding: 11px; border: 1px solid var(--line); border-radius: 9px; background: linear-gradient(145deg, #191424, #100d17); }
 .live-game-identity { display: flex; justify-content: space-between; align-items: baseline; margin: 2px 0 9px; }
 .live-game-identity strong { color: #f4edf8; font-size: 15px; }
 .live-game-identity span, .overlay-muted, .live-game-stats small, .live-craze small { color: #958a9f; font-size: 10px; }
 .live-game-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
-.live-game-stats > div { min-width: 0; padding: 6px 4px; background: #100d17; border-radius: 6px; text-align: center; }
+.live-game-stats > div { min-width: 0; padding: 8px 5px; background: #100d17; border-radius: 6px; text-align: center; }
 .live-game-stats span { display: block; color: #a79baa; font-size: 9px; text-transform: uppercase; }
 .live-game-stats strong { display: block; color: #f4edf8; font-size: 13px; }
 .live-game-stats small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -369,7 +369,7 @@ footer { color: #5f5868; font-size: 10px; text-align: center; margin-top: 42px; 
 .live-craze strong { color: #f0c46f; font-size: 17px; }
 .live-augment-list { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
 .live-augment-list > div, .item-buy-list > div { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 5px; background: #100d17; border-radius: 6px; }
-.live-augment-list span, .item-buy-list strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #e4dce9; font-size: 10px; }
+.live-augment-list span, .item-buy-list strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #e4dce9; font-size: 11px; }
 .item-buy-list { display: grid; gap: 5px; }
 .item-buy-list > div { padding: 6px; }
 .item-buy-list span { min-width: 0; flex: 1; }

@@ -26,6 +26,6 @@ export function LiveGameHUD({ snapshot, build, augments }: { snapshot: GameState
     </div>)}</div>
     <div className="live-craze"><div><span>Craze Factor</span><strong>{build?.crazeFactor ?? "—"}</strong></div><small>{build?.crazeLabel ?? "Resolver comparison unavailable"}</small></div>
     <div className="overlay-section-title"><span>Chosen augments</span><b>{augments.length}</b></div>
-    {augments.length > 0 ? <div className="live-augment-list">{augments.map((augment) => <div key={augment.entityKey}><Image src={augment.iconUrl} width={25} height={25} alt="" unoptimized /><span>{augment.name}</span></div>)}</div> : <p className="overlay-muted">Augments will appear when the local client exposes them.</p>}
+    {augments.length > 0 ? <div className="live-augment-list">{augments.map((augment) => <div key={augment.entityKey}><Image src={augment.iconUrl} width={28} height={28} alt="" unoptimized /><span>{augment.name}</span></div>)}</div> : <p className="overlay-muted">No selected augment IDs are exposed yet. Augment-granted spells and supported client events are detected automatically; Ctrl+Shift+A remains available for offer capture.</p>}
   </section>;
 }

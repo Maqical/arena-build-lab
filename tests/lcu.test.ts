@@ -47,3 +47,28 @@ test("extracts selected augments from observed live-client shapes", () => {
   });
   assert.deepEqual(refs, ["augment:101", "augment:202", "augment:303", "Goliath"]);
 });
+
+test("recognizes an augment-backed Arena summoner spell on the active player", () => {
+  const refs = extractOwnedAugmentRefs({
+    activePlayer: { summonerName: "Player#NA1", fullRunes: {} },
+    allPlayers: [{
+      summonerName: "Player#NA1",
+      runes: null,
+      summonerSpells: {
+        summonerSpellTwo: { rawDescription: "GeneratedTip_Spell_Augment_ClownCollege_Deceive_Description" },
+      },
+    }],
+  });
+  assert.deepEqual(refs, ["ClownCollege"]);
+});
+
+test("does not collect augment-like data from opposing player records", () => {
+  const refs = extractOwnedAugmentRefs({
+    activePlayer: { summonerName: "Me#NA1", fullRunes: {} },
+    allPlayers: [
+      { summonerName: "Me#NA1", runes: null },
+      { summonerName: "Opponent#NA1", arenaAugments: [101, 202] },
+    ],
+  });
+  assert.deepEqual(refs, []);
+});
