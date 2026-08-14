@@ -38,6 +38,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .desktop-brand { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 5px; text-decoration: none; }
 .desktop-brand > span { display: grid; width: 38px; height: 38px; place-items: center; flex: 0 0 auto; border: 1px solid rgba(100, 219, 255, .5); border-radius: 11px; background: linear-gradient(145deg, #123e59, #512d85); box-shadow: 0 0 22px rgba(67, 197, 255, .16); color: #eafaff; font: 700 11px var(--font-geist-mono), monospace; }
 .desktop-brand strong { font-size: 13px; line-height: 1.15; }
+.desktop-brand strong small { display: block; margin-top: 3px; color: var(--muted); font: 600 8px/1 var(--font-geist-mono), monospace; letter-spacing: .08em; text-transform: uppercase; }
 .desktop-sidebar nav { display: flex; flex: 1; flex-direction: column; gap: 5px; margin-top: 25px; }
 .desktop-sidebar nav a { display: flex; align-items: center; gap: 11px; min-height: 42px; padding: 9px 10px; border: 1px solid transparent; border-radius: 9px; color: #a9afbe; text-decoration: none; transition: .16s ease; }
 .desktop-sidebar nav a > span { width: 22px; color: #7892aa; font-size: 17px; text-align: center; }
@@ -496,6 +497,13 @@ footer { color: #5f5868; font-size: 10px; text-align: center; margin-top: 42px; 
 .screenshot-confirm > button > strong { min-width: 0; overflow-wrap: anywhere; font-size: 16px; line-height: 1.35; }
 .screenshot-confirm > button > small { color: #b8acbe; }
 .screenshot-confirm > button.confirmed { border-color: #5ee6a8; background: rgba(42,121,87,.22); }
+.overlay-manual-selection { margin: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255,255,255,.025); }
+.overlay-manual-selection summary { padding: 9px 10px; color: var(--muted); cursor: pointer; font-size: 11px; }
+.overlay-manual-selection > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; padding: 0 9px 9px; }
+.overlay-manual-selection select, .overlay-manual-selection button { min-height: 34px; border: 1px solid var(--line); border-radius: 6px; background: #0b0811; color: var(--ink); }
+.overlay-manual-selection select { min-width: 0; padding: 0 7px; }
+.overlay-manual-selection button { padding: 0 12px; cursor: pointer; }
+.overlay-manual-selection button:disabled { cursor: not-allowed; opacity: .45; }
 .item-buy-list { display: grid; gap: 5px; }
 .item-buy-list > div { padding: 6px; }
 .item-buy-list span { min-width: 0; flex: 1; }

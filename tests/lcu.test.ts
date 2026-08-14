@@ -43,9 +43,14 @@ test("extracts only explicitly named three-option Arena augment offers", () => {
 test("extracts selected augments from observed live-client shapes", () => {
   const refs = extractOwnedAugmentRefs({
     activePlayer: { generalRunes: [{ id: 101 }, { perkId: 202 }] },
-    arena: { augments: [303, { apiName: "Goliath" }] },
+    arena: { selectedAugments: [303, { apiName: "Goliath" }] },
   });
-  assert.deepEqual(refs, ["augment:101", "augment:202", "augment:303", "Goliath"]);
+  assert.deepEqual(refs, ["augment:303", "Goliath"], "ordinary runes must not pollute owned augments");
+});
+
+test("does not mistake offered options for owned selections", () => {
+  assert.deepEqual(extractOwnedAugmentRefs({ arena: { augmentOptions: [{ augmentId: 101 }, { augmentId: 202 }, { augmentId: 303 }] } }), []);
+  assert.deepEqual(extractOwnedAugmentRefs({ arena: { cardOptions: [{ cardId: 1101 }, { cardId: 1102 }, { cardId: 1103 }] } }), []);
 });
 
 test("recognizes an augment-backed Arena summoner spell on the active player", () => {

@@ -45,7 +45,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
       <aside className="desktop-sidebar" aria-label="Primary navigation">
         <Link className="desktop-brand" href="/" aria-label="Arena Build Lab dashboard">
           <span>ABL</span>
-          <strong>Arena Build Lab</strong>
+          <strong>Arena Build Lab<small>Frbz.gg</small></strong>
         </Link>
         <nav>
           {NAVIGATION.map((item) => {

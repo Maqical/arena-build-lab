@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChampSelectAssistant } from "@/components/overlay/ChampSelectAssistant";
 import { ItemAssistant } from "@/components/overlay/ItemAssistant";
 import { LiveGameHUD } from "@/components/overlay/LiveGameHUD";
@@ -82,10 +82,12 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
   const [connectionState, setConnectionState] = useState<ConnectionState>("connecting");
   const [recommendation, setRecommendation] = useState<AIPickerResponse | null>(null);
   const [scannedAugmentKeys, setScannedAugmentKeys] = useState<string[]>([]);
+  const [manualSelectionKey, setManualSelectionKey] = useState("");
   const [liveBuild, setLiveBuild] = useState<LiveResolveResponse | null>(null);
   const [error, setError] = useState("");
   const [visible, setVisible] = useState(true);
   const [welcome] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("welcome") === "1");
+  const [demoMode] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).has("demo"));
   const recommendationSignature = useRef("");
   const resolveSignature = useRef("");
 
@@ -130,10 +132,13 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
   );
   const championMeta = champion ? metaLookup.get(`champion:${champion.key}`) : undefined;
   const championMetaPercent = championMeta?.winRate == null ? null : championMeta.sourceName === "riot_api_local" ? championMeta.winRate * 100 : championMeta.winRate;
-  const confirmScannedPick = (entityKey: string) => {
+  const confirmScannedPick = useCallback((entityKey: string) => {
     setScannedAugmentKeys((current) => [...new Set([...current, entityKey])]);
     setError("");
-  };
+    if (demoMode) return;
+    void postJson<{ ok: true; entityKey: string }>("/api/lcu/selection", { entityKey })
+      .catch((caught) => setError(caught instanceof Error ? caught.message : String(caught)));
+  }, [demoMode]);
   const displayedOffers = useMemo(() => {
     if (offered.length > 0) return offered;
     if (!recommendation?.screenshotExtracted) return [];
@@ -141,6 +146,12 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
       .map((option) => entityLookup.get(normalized(option.entity.entityKey)))
       .filter((entity): entity is OverlayCatalogEntity => entity?.kind === "augment");
   }, [entityLookup, offered, recommendation]);
+  const manualSelections = useMemo(
+    () => entities
+      .filter((entity) => entity.kind === "augment" && (snapshot?.mode === "aram_mayhem" ? entity.numericId >= 1000 : entity.numericId < 1000))
+      .sort((left, right) => left.name.localeCompare(right.name)),
+    [entities, snapshot?.mode],
+  );
 
   useEffect(() => {
     const demo = new URLSearchParams(window.location.search).get("demo");
@@ -201,12 +212,11 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
       const option = recommendation.options[Number(event.key) - 1];
       if (!option) return;
       event.preventDefault();
-      setScannedAugmentKeys((current) => [...new Set([...current, option.entity.entityKey])]);
-      setError("");
+      confirmScannedPick(option.entity.entityKey);
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [recommendation]);
+  }, [confirmScannedPick, recommendation]);
 
   const theory = liveBuild?.build.stats;
   const live = snapshot?.liveStats;
@@ -272,6 +282,11 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
           setError("");
         }}
       />}
+
+      {visible && snapshot?.supportsAugments && snapshot?.phase === "in_progress" && <details className="overlay-manual-selection">
+        <summary>Card not detected? Add it manually</summary>
+        <div><select value={manualSelectionKey} onChange={(event) => setManualSelectionKey(event.target.value)}><option value="">Select {snapshot.mode === "aram_mayhem" ? "Mayhem card" : "Arena augment"}…</option>{manualSelections.map((entity) => <option value={entity.entityKey} key={entity.entityKey}>{entity.name}</option>)}</select><button type="button" disabled={!manualSelectionKey} onClick={() => { confirmScannedPick(manualSelectionKey); setManualSelectionKey(""); }}>Add</button></div>
+      </details>}
 
       {visible && snapshot?.supportsAugments && snapshot?.phase !== "disconnected" && snapshot?.phase !== "in_progress" && snapshot?.phase !== "post_game" && <section className="overlay-hud">
         <div className="overlay-section-title"><span>Live stat tracker</span><b>{live ? "Live + theory" : "Theoretical"}</b></div>

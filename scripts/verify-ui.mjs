@@ -30,7 +30,7 @@ try {
 
   await page.goto("http://localhost:3000/settings", { waitUntil: "domcontentloaded" });
   await page.getByRole("heading", { name: "Settings", exact: true }).waitFor();
-  await page.getByText("v1.0.2", { exact: true }).waitFor();
+  await page.getByText(/^v\d+\.\d+\.\d+$/, { exact: true }).waitFor();
   await page.screenshot({ path: path.join(output, "settings.png"), fullPage: true });
 
   await page.goto("http://localhost:3000/build-lab", { waitUntil: "domcontentloaded" });

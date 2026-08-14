@@ -144,14 +144,18 @@ export function extractOwnedAugmentRefs(liveData: unknown): string[] {
     const spellAugment = augmentNameFromSpell(value);
     if (spellAugment) output.push(spellAugment);
     if (Array.isArray(value)) {
-      if (/(augment|generalRunes|selectedPerks|perkIds|mayhem|card)/i.test(keyPath)) output.push(...value.map(normalizedAugmentRef).filter((entry): entry is string => Boolean(entry)));
+      const selectionContext = /(?:selected|owned|current|equipped).*(?:augment|card)|(?:augment|card).*(?:selected|owned|current|equipped)/i.test(keyPath);
+      const offerContext = /(?:offer|option|choice)/i.test(keyPath);
+      if (selectionContext && !offerContext) output.push(...value.map(normalizedAugmentRef).filter((entry): entry is string => Boolean(entry)));
       value.forEach((entry, index) => visit(entry, `${keyPath}.${index}`, depth + 1));
       return;
     }
     const object = record(value);
     if (!object) return;
     for (const [key, child] of Object.entries(object)) {
-      if (/(?:^|_)(augmentId|selectedAugment|ownedAugment|perkId|cardId|selectedCard|ownedCard)$/i.test(key) && !Array.isArray(child) && !record(child)) {
+      const selectionPath = `${keyPath}.${key}`;
+      const explicitSelection = /(?:selected|owned|current|equipped).*(?:augment|card)|(?:augment|card).*(?:selected|owned|current|equipped)/i.test(selectionPath);
+      if (explicitSelection && !/(?:offer|option|choice)/i.test(selectionPath) && !Array.isArray(child) && !record(child)) {
         output.push(normalizedAugmentRef(child) ?? "");
       }
       visit(child, `${keyPath}.${key}`, depth + 1);
@@ -272,8 +276,8 @@ export function companionMode(details: { isArena: boolean; queueId: number | nul
 }
 
 function normalizedPhase(rawPhase: string, supportsAugments: boolean, offers: readonly string[], liveAvailable: boolean): ArenaGamePhase {
-  if (offers.length === 3) return "augment_select";
   if (liveAvailable || rawPhase === "InProgress") return "in_progress";
+  if (offers.length === 3) return "augment_select";
   if (rawPhase === "ChampSelect" && supportsAugments) return "champ_select";
   if (["Lobby", "Matchmaking", "ReadyCheck"].includes(rawPhase) && supportsAugments) return "arena_lobby";
   if (["WaitingForStats", "PreEndOfGame", "EndOfGame"].includes(rawPhase)) return "post_game";
@@ -352,6 +356,14 @@ export class GameStateMonitor extends EventEmitter {
     return structuredClone(this.snapshotValue);
   }
 
+  confirmSelection(reference: string): boolean {
+    const normalized = normalizedAugmentRef(reference);
+    if (!normalized || !this.snapshotValue.supportsAugments || !["augment_select", "in_progress"].includes(this.snapshotValue.phase)) return false;
+    this.selectedAugments.add(normalized);
+    void this.refresh();
+    return true;
+  }
+
   start(): void {
     if (this.running) return;
     this.running = true;
@@ -376,7 +388,7 @@ export class GameStateMonitor extends EventEmitter {
     if (offers.length === 3) {
       this.offers = { refs: offers, sourceUri: event.uri, detectedAt: new Date().toISOString(), expiresAt: Date.now() + 90_000 };
     }
-    if (/(augment|cherry|perk|mayhem|card|kiwi)/i.test(event.uri) && !/(catalog|game-data\/assets)/i.test(event.uri)) {
+    if (offers.length !== 3 && /(augment|cherry|perk|mayhem|card|kiwi)/i.test(event.uri) && !/(catalog|game-data\/assets)/i.test(event.uri)) {
       const selected = extractOwnedAugmentRefs({ arena: event.data });
       if (selected.length > 0 && selected.length <= 4) selected.forEach((reference) => this.selectedAugments.add(reference));
     }

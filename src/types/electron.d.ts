@@ -9,7 +9,6 @@ declare global {
       runWorker: (worker: "riot" | "youtube" | "data") => Promise<{ ok: boolean; message: string }>;
       applyAppearance: (appearance: { opacity: number; scale: number }) => Promise<{ ok: boolean }>;
       openOverlay: () => Promise<{ ok: boolean }>;
-      checkForUpdates: () => Promise<{ ok: boolean; message: string }>;
     };
   }
 }

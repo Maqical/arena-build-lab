@@ -89,15 +89,16 @@ export async function evaluateAIPicker(request: AIPickerRequest): Promise<AIPick
 
   const mode = request.mode ?? "arena";
   const augmentRows = db.prepare(`
-    SELECT entity_key, name FROM entities
+    SELECT entity_key, numeric_id, name FROM entities
     WHERE kind='augment' AND ((?='aram_mayhem' AND numeric_id>=1000) OR (?='arena' AND numeric_id<1000))
     ORDER BY name, numeric_id
-  `).all(mode, mode) as Array<{ entity_key: string; name: string }>;
+  `).all(mode, mode) as Array<{ entity_key: string; numeric_id: number; name: string }>;
   let offeredKeys = [...new Set(request.offeredAugmentKeys ?? [])];
   let screenshotExtracted = false;
   if (offeredKeys.length !== 3 && request.screenshotDataUrl) {
-    const extractedNames = await extractScreenshotAugments(request.screenshotDataUrl, augmentRows.map((row) => row.name));
-    const byName = new Map(augmentRows.map((row) => [normalizedName(row.name), row.entity_key]));
+    const canonicalRows = [...new Map(augmentRows.map((row) => [normalizedName(row.name), row])).values()];
+    const extractedNames = await extractScreenshotAugments(request.screenshotDataUrl, canonicalRows.map((row) => row.name));
+    const byName = new Map(canonicalRows.map((row) => [normalizedName(row.name), row.entity_key]));
     offeredKeys = extractedNames.map((name) => byName.get(normalizedName(name)) ?? "");
     if (offeredKeys.some((key) => !key)) throw new Error(`Could not match all screenshot options: ${extractedNames.join(", ")}`);
     screenshotExtracted = true;

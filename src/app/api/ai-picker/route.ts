@@ -14,6 +14,6 @@ export async function POST(request: Request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const aiFailure = /openai|api key|structured output|AI request/i.test(message);
-    return Response.json({ error: aiFailure ? `AI vision is temporarily unavailable. Select the three augments manually to keep using stat math. ${message}` : message }, { status: aiFailure ? 503 : 400 });
+    return Response.json({ error: aiFailure ? `AI vision is temporarily unavailable. Use the overlay's manual card selector to keep the HUD and recommendations updated. ${message}` : message }, { status: aiFailure ? 503 : 400 });
   }
 }

@@ -129,7 +129,17 @@ function startNext() {
 }
 
 async function restartNext() {
-  if (serverProcess) serverProcess.kill();
+  if (serverProcess) {
+    const previous = serverProcess;
+    const stopped = new Promise((resolve) => {
+      const timer = setTimeout(resolve, 5_000);
+      const done = () => { clearTimeout(timer); resolve(); };
+      previous.once?.("exit", done);
+      previous.once?.("close", done);
+    });
+    previous.kill();
+    await stopped;
+  }
   startNext();
   await waitForServer();
 }
@@ -152,7 +162,12 @@ function waitForServer() {
   return new Promise((resolve, reject) => {
     const started = Date.now();
     const probe = () => {
-      const request = http.get(`http://127.0.0.1:${PORT}/overlay`, (response) => { response.resume(); resolve(); });
+      const request = http.get(`http://127.0.0.1:${PORT}/overlay`, (response) => {
+        response.resume();
+        if ((response.statusCode ?? 500) < 500) resolve();
+        else if (Date.now() - started > 30_000) reject(new Error(`Arena Build Lab server returned HTTP ${response.statusCode}.`));
+        else setTimeout(probe, 250);
+      });
       request.on("error", () => {
         if (Date.now() - started > 30_000) reject(new Error("Arena Build Lab server did not start."));
         else setTimeout(probe, 250);
@@ -171,7 +186,11 @@ async function capturePicker() {
   clipboard.writeImage(source.thumbnail);
   mainWindow.show();
   mainWindow.focus();
-  mainWindow.webContents.executeJavaScript(`(() => { const button = [...document.querySelectorAll("button")].find((candidate) => /Paste (?:augment|Mayhem card) snip/i.test(candidate.textContent || "")); if (button) button.click(); })()`);
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const clicked = await mainWindow.webContents.executeJavaScript(`(() => { const button = [...document.querySelectorAll("button")].find((candidate) => /Paste (?:augment|Mayhem card) snip/i.test(candidate.textContent || "")); if (!button) return false; button.click(); return true; })()`);
+    if (clicked) return;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
 }
 
 function createWindow() {
@@ -271,7 +290,6 @@ ipcMain.handle("settings:save", async (_event, next) => {
 });
 ipcMain.handle("appearance:apply", (_event, next) => applyAppearance(next || appearance));
 ipcMain.handle("window:overlay", () => { openOverlay(); return { ok: true }; });
-ipcMain.handle("updates:check", () => ({ ok: false, message: "Updates are not configured for this local build yet." }));
 ipcMain.handle("worker:run", (_event, worker) => {
   const selected = worker === "youtube" ? "youtube" : worker === "data" ? "data" : "riot";
   const label = selected === "youtube" ? "YouTube catalog" : selected === "data" ? "Data Dragon" : "Riot match";

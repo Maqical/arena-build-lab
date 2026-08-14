@@ -8,5 +8,4 @@ contextBridge.exposeInMainWorld("arenaDesktop", {
   runWorker: (worker) => ipcRenderer.invoke("worker:run", worker),
   applyAppearance: (appearance) => ipcRenderer.invoke("appearance:apply", appearance),
   openOverlay: () => ipcRenderer.invoke("window:overlay"),
-  checkForUpdates: () => ipcRenderer.invoke("updates:check"),
 });

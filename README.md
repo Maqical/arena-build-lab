@@ -1,5 +1,7 @@
 # Arena Build Lab
 
+Arena Build Lab is a local-first companion from Frbz.gg, published by Froobs, LLC.
+
 Local-first Arena and ARAM: Mayhem companion with a live overlay, recursive stat-conversion engine, AI-assisted augment picker, personal match history, and an immutable local data warehouse.
 
 ## Start
