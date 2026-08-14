@@ -294,28 +294,59 @@ async function visualCatalogTemplates() {
 
 async function matchVisualOffers(thumbnail) {
   const templates = await visualCatalogTemplates();
-  if (templates.length === 0) return [];
+  if (templates.length === 0) return { match: null, diagnostics: { reason: "empty-catalog" } };
   const { width, height } = thumbnail.getSize();
-  const centerY = Math.round(height * 0.2935);
-  const matchKind = (kind, normalizedCropSize, templateSize, minimumScore, minimumMargin) => {
+  const matchKind = (kind, cropVariants, templateSize, minimumScore, minimumMargin) => {
     const kindTemplates = templates.filter((template) => template.kind === kind);
-    const cropSize = Math.max(templateSize, Math.round(width * normalizedCropSize));
     const results = [];
     for (const centerXRatio of [0.2945, 0.5, 0.705]) {
-      const crop = thumbnail.crop({ x: Math.round(width * centerXRatio - cropSize / 2), y: Math.round(centerY - cropSize / 2), width: cropSize, height: cropSize }).resize({ width: templateSize, height: templateSize, quality: "best" }).toBitmap();
-      const ranked = kindTemplates.map((template) => ({ ...template, score: maskedCorrelation(crop, template.bitmap, kind === "item" ? 0 : 12) })).sort((left, right) => right.score - left.score);
+      const bestByEntity = new Map();
+      for (const variant of cropVariants) {
+        const cropSize = Math.max(templateSize, Math.round(width * variant.size));
+        const centerY = Math.round(height * variant.y);
+        const crop = thumbnail.crop({
+          x: Math.max(0, Math.min(width - cropSize, Math.round(width * centerXRatio - cropSize / 2))),
+          y: Math.max(0, Math.min(height - cropSize, Math.round(centerY - cropSize / 2))),
+          width: Math.min(cropSize, width),
+          height: Math.min(cropSize, height),
+        }).resize({ width: templateSize, height: templateSize, quality: "best" }).toBitmap();
+        for (const template of kindTemplates) {
+          const score = maskedCorrelation(crop, template.bitmap, kind === "item" ? 0 : 12);
+          const previous = bestByEntity.get(template.entityKey);
+          if (!previous || score > previous.score) bestByEntity.set(template.entityKey, { ...template, score, variant });
+        }
+      }
+      const ranked = [...bestByEntity.values()].sort((left, right) => right.score - left.score);
       const best = ranked[0];
       const runnerUp = ranked.find((candidate) => candidate.name !== best?.name);
-      if (!best || best.score < minimumScore || best.score - (runnerUp?.score ?? -1) < minimumMargin) return null;
-      results.push({ entityKey: best.entityKey, name: best.name, score: best.score });
+      results.push({ entityKey: best?.entityKey ?? "", name: best?.name ?? "", score: best?.score ?? -1, margin: best ? best.score - (runnerUp?.score ?? -1) : -1, variant: best?.variant ?? null });
     }
-    return { kind, matches: results, confidence: Math.min(...results.map((result) => result.score)) };
+    const accepted = results.length === 3 && results.every((result) => result.entityKey && result.score >= minimumScore && result.margin >= minimumMargin);
+    return { kind, matches: results, confidence: Math.min(...results.map((result) => result.score)), accepted };
   };
-  const augment = matchKind("augment", 0.0933, 128, 0.82, 0.045);
-  const item = matchKind("item", 0.0456, 64, 0.86, 0.08);
-  if (!augment) return item;
-  if (!item) return augment;
-  return augment.confidence >= item.confidence ? augment : item;
+  const augment = matchKind("augment", [{ y: 0.2935, size: 0.0933 }], 128, 0.82, 0.045);
+  // Prismatic art is smaller than augment art and shifts vertically across
+  // Arena/Mayhem UI scales. Search bounded icon-sized crops inside each card.
+  const item = matchKind("item", [
+    { y: 0.27, size: 0.036 }, { y: 0.27, size: 0.046 }, { y: 0.27, size: 0.058 },
+    { y: 0.294, size: 0.036 }, { y: 0.294, size: 0.046 }, { y: 0.294, size: 0.058 },
+    { y: 0.32, size: 0.036 }, { y: 0.32, size: 0.046 }, { y: 0.32, size: 0.058 },
+  ], 64, 0.74, 0.03);
+  const accepted = [augment, item].filter((candidate) => candidate.accepted).sort((left, right) => right.confidence - left.confidence);
+  return {
+    match: accepted[0] ?? null,
+    diagnostics: {
+      augment: { accepted: augment.accepted, confidence: augment.confidence, cards: augment.matches.map(({ name, score, margin }) => ({ name, score, margin })) },
+      item: { accepted: item.accepted, confidence: item.confidence, cards: item.matches.map(({ name, score, margin, variant }) => ({ name, score, margin, variant })) },
+    },
+  };
+}
+
+function appendVisualDiagnostic(payload) {
+  try {
+    const target = path.join(app.getPath("userData"), "selection-diagnostics.local.ndjson");
+    fs.appendFileSync(target, `${JSON.stringify({ at: new Date().toISOString(), ...payload })}\n`, "utf8");
+  } catch { /* Diagnostics must never interrupt the selection pipeline. */ }
 }
 
 function maybeConfirmVisualPick() {
@@ -331,7 +362,9 @@ async function scanVisualOffers(thumbnail, snapshot, session) {
   visualScanInFlight = true;
   session.lastScanAt = Date.now();
   try {
-    const localMatches = await matchVisualOffers(thumbnail);
+    const localResult = await matchVisualOffers(thumbnail);
+    const localMatches = localResult.match;
+    appendVisualDiagnostic({ event: "offer-scan", diagnostics: localResult.diagnostics });
     let result;
     if (localMatches?.matches.length === 3) {
       const offered = localMatches.matches.map((match) => match.entityKey);

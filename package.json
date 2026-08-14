@@ -1,6 +1,6 @@
 {
   "name": "arena-build-lab",
-  "version": "1.0.5",
+  "version": "1.0.7",
   "private": true,
   "main": "electron/main.cjs",
   "description": "Local-first League of Legends Arena and ARAM: Mayhem companion overlay",
@@ -67,7 +67,7 @@
   "build": {
     "appId": "com.arenabuildlab.desktop",
     "productName": "Arena Build Lab",
-    "copyright": "Copyright © 2026 Froobs, LLC.",
+    "copyright": "Copyright (c) 2026 Froobs, LLC.",
     "publish": null,
     "artifactName": "Arena-Build-Lab-${version}-Setup.${ext}",
     "asar": true,

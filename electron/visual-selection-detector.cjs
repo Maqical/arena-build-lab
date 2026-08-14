@@ -25,11 +25,11 @@ function stripePercentile(buffer, width, height, normalizedX, halfWidth, fractio
   return percentile(values, fraction);
 }
 
-/** Detects the stable three-card layout observed at normalized 16:9 Arena coordinates. */
+/** Detects the stable three-card layout observed at normalized 16:9 and 16:10 Arena coordinates. */
 function detectAugmentSelectionFrame(bitmap, width, height) {
   if (!Buffer.isBuffer(bitmap) || width < 960 || height < 540 || bitmap.length < width * height * 4) return false;
   const aspect = width / height;
-  if (aspect < 1.7 || aspect > 1.85) return false;
+  if (aspect < 1.55 || aspect > 1.9) return false;
   const borderThresholds = BORDER_X.map((x) => stripePercentile(bitmap, width, height, x, 4, 0.75));
   const innerThresholds = INNER_X.map((x) => stripePercentile(bitmap, width, height, x, Math.max(12, Math.round(width * 0.011)), 0.35));
   const brightBorders = borderThresholds.filter((value) => value > 145).length;

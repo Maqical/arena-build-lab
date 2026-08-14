@@ -4,11 +4,11 @@ Arena Build Lab is a Windows companion for League of Legends Arena and ARAM: May
 
 It combines live game context, automatic and assisted augment intake, recursive stat-conversion math, champion-specific build guidance, personal match history, and a local match warehouse. The application is read-only: it observes supported game/client data and never controls gameplay.
 
-Current desktop version: **v1.0.5**
+Current desktop version: **v1.0.7**
 
 ## Install
 
-Run `Arena-Build-Lab-1.0.5-Setup.exe`. The installer creates Start Menu and desktop shortcuts and preserves the local warehouse under `%APPDATA%\Arena Build Lab` during upgrades.
+Run `Arena-Build-Lab-1.0.7-Setup.exe`. The installer creates Start Menu and desktop shortcuts and preserves the local warehouse under `%APPDATA%\Arena Build Lab` during upgrades.
 
 On first launch:
 
@@ -32,6 +32,7 @@ Arena Build Lab uses a provider pipeline rather than coupling the UI to one data
 Every source normalizes to the same internal selection IDs. The HUD records which provider supplied a choice, updates item recommendations for the current champion and selected augment set, and re-runs the stat resolver.
 
 The next implementation milestones and release gates live in [ROADMAP.md](ROADMAP.md).
+The companion-product benchmark and Frbz feature synthesis live in [docs/companion-feature-benchmark.md](docs/companion-feature-benchmark.md).
 
 ## Features
 

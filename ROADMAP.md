@@ -1,6 +1,6 @@
 # Arena Build Lab Master Roadmap
 
-This is the authoritative implementation plan after v1.0.5. Issues and release work should link back to one of the milestones below instead of creating parallel plans.
+This is the authoritative implementation plan after v1.0.7. Issues and release work should link back to one of the milestones below instead of creating parallel plans.
 
 ## Product objective
 
@@ -13,12 +13,24 @@ Turn live Arena and ARAM: Mayhem state into an immediate, explainable answer to 
 
 The companion remains read-only. Automatic observation is in scope; automated gameplay input is not.
 
-## Current baseline — v1.0.5
+## Product operating model — the Frbz synthesis
+
+Arena Build Lab takes the strongest recurring companion patterns and implements them around Arena and ARAM: Mayhem rather than cloning another product's presentation:
+
+- **Before play:** champion/build context, duo context, and clear readiness/patch state.
+- **At each decision:** recognize the three choices, compare immediate stat effects, explain synergy, and show multiple viable continuation paths.
+- **During play:** maintain an observed timeline for owned selections, inventory, round state, and peak stats.
+- **After play:** compare predictions with observed results, surface personal records, and turn discrepancies into formula/data work.
+- **Across sessions:** learn from the local warehouse and creator/cohort evidence while retaining source, patch, region, and sample size.
+
+The release blocker is selection completeness: augment cards and Prismatic-item offers must both reach an explanation and build path during the choice window. Broader coaching features follow that gate.
+
+## Current baseline — v1.0.7
 
 - Windows Electron installer, tray integration, persistent overlay placement, and automatic LCU reconnection.
 - Command Center, live view, overlay, Build Lab, history, trophies, extreme builds, and settings.
 - LCU/Live Client state for phase, champion, stats, and items.
-- Local three-card visual recognition for augment and Prismatic-item offers, plus manual and screenshot-assisted fallbacks.
+- Local three-card visual recognition for augment and Prismatic-item offers, plus manual and screenshot-assisted fallbacks. Prismatic matching now searches bounded icon positions/scales and writes score-only local diagnostics on uncertain screens.
 - Provider-neutral augment parser and local provider-event endpoint.
 - Tested parsing for Overwolf's documented Mayhem `augments` and `picked_augment` payloads.
 - Immutable 1,075-match local warehouse with 18,438 participant rows.
@@ -75,7 +87,7 @@ Goal: provide standalone automatic detection when no structured event feed is av
 
 - Collect sanitized screenshots for supported resolutions, display scaling, UI scaling, and languages.
 - Detect the three card regions locally before classification. **Implemented.**
-- Match augment and Prismatic item icon fingerprints against the local catalog; require confidence thresholds and temporal agreement across frames. **Implemented for the current 16:9 card layout.**
+- Match augment and Prismatic item icon fingerprints against the local catalog; require confidence thresholds and temporal agreement across frames. **Implemented for validated 16:9 and 16:10 card layouts.**
 - Process only while a supported game is active and a selection-screen signature is present.
 - Keep pixels ephemeral by default; store only opt-in sanitized diagnostics.
 - Emit the same provider-neutral offer/pick events used by Overwolf and manual input. **Implemented.**
@@ -118,6 +130,8 @@ Goal: provide the fast situational context expected from a modern companion app 
 - Maintain an observed inventory ledger with item, first-seen time, last-seen time, and source.
 - Present opponent item deltas and last-observed timestamps without inventing unseen state.
 - Add self-planning hints using the player's own gold, inventory, round timer, and recommended purchase path.
+- Add a phase-aware event timeline modeled around actionable observations: round start, selection, purchase, opponent item first-seen, combat start/end, and personal stat peak.
+- Where a mode exposes lane state, show last-observed opponent inventory and return timing as observations with timestamps; never present an estimate as a newly observed fact.
 - Compute duo synergy from same-team participant records with patch, region, and sample-size provenance.
 - Keep all network fetches queued, cached, and rate-limit aware.
 
@@ -139,6 +153,7 @@ Goal: answer `champion + owned augments + owned items + objective` with useful, 
 - Add objective controls for health, AD, AP, attack speed, haste, movement, crit, on-hit, durability, and balanced placement.
 - Explain conversion order, scenario inputs, marginal stat gain, sample size, and patch age.
 - Track personal outcomes separately from cohort aggregates.
+- Add a compact voice/text question surface only after the same query can be answered deterministically by the local recommendation API.
 
 ### Acceptance gate
 

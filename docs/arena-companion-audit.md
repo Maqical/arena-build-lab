@@ -36,7 +36,7 @@ Overwolf's documented League feature set includes:
 - `picked_augment`: the most recently selected augment;
 - `live_client_data`, item, match, and game-state updates used by companion interfaces.
 
-Arena Build Lab v1.0.5 contains provider-neutral structured and local-visual selection adapters. The standard Electron build can now recognize the verified three-card layout locally; the Overwolf Electron target remains an additional structured-event distribution path.
+Arena Build Lab v1.0.7 contains provider-neutral structured and local-visual selection adapters. The standard Electron build can recognize the verified 16:9 and 16:10 three-card layouts locally; Prismatic matching searches a bounded set of icon positions and scales and records score-only local diagnostics when confidence is insufficient. The Overwolf Electron target remains an additional structured-event distribution path.
 
 This distinction is architectural, not a product-policy question: structured provider events are preferred when present, and local visual/manual providers feed the identical internal selection pipeline when they are not.
 

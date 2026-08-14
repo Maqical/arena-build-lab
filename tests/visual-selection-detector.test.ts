@@ -32,6 +32,7 @@ function syntheticSelectionFrame(width = 1600, height = 900): Buffer {
 
 test("detects the normalized three-card selection layout", () => {
   assert.equal(detectAugmentSelectionFrame(syntheticSelectionFrame(), 1600, 900), true);
+  assert.equal(detectAugmentSelectionFrame(syntheticSelectionFrame(2304, 1440), 2304, 1440), true);
   assert.equal(detectAugmentSelectionFrame(Buffer.alloc(1600 * 900 * 4, 105), 1600, 900), false);
 });
 
