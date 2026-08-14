@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const http = require("node:http");
 const { OVERLAY_BASE_WIDTH, OVERLAY_BASE_HEIGHT, normalizedBounds, defaultOverlayBounds: makeDefaultOverlayBounds, visibleOverlayBounds: restoreVisibleBounds } = require("./window-state.cjs");
+const { detectAugmentSelectionFrame, cardIndexAtPoint } = require("./visual-selection-detector.cjs");
 
 app.setName("Arena Build Lab");
 
@@ -20,6 +21,13 @@ let dataInitializing = false;
 let windowMode = "overlay";
 let applyingWindowBounds = false;
 let boundsSaveTimer;
+let visualWatcherTimer;
+let visualPollBusy = false;
+let visualScanInFlight = false;
+let visualDetectedFrames = 0;
+let visualMissingFrames = 0;
+let visualSession = null;
+let visualCatalogPromise;
 const settingsPath = () => path.join(app.getPath("userData"), "user_settings.json");
 
 function defaultSettings() {
@@ -185,6 +193,215 @@ function forwardProviderEvent(payload) {
   request.end(body);
 }
 
+function localJson(pathname, method = "GET", payload) {
+  return new Promise((resolve, reject) => {
+    const body = payload == null ? null : Buffer.from(JSON.stringify(payload));
+    const request = http.request({
+      hostname: "127.0.0.1",
+      port: PORT,
+      path: pathname,
+      method,
+      headers: body ? { "Content-Type": "application/json", "Content-Length": body.length } : undefined,
+      timeout: 15_000,
+    }, (response) => {
+      const chunks = [];
+      response.on("data", (chunk) => chunks.push(chunk));
+      response.on("end", () => {
+        try {
+          const result = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+          if ((response.statusCode ?? 500) >= 400) reject(new Error(String(result.error || `HTTP ${response.statusCode}`)));
+          else resolve(result);
+        } catch (error) { reject(error); }
+      });
+    });
+    request.on("error", reject);
+    request.on("timeout", () => request.destroy(new Error("Local companion request timed out.")));
+    if (body) request.write(body);
+    request.end();
+  });
+}
+
+function resetVisualSession() {
+  visualDetectedFrames = 0;
+  visualMissingFrames = 0;
+  visualSession = null;
+}
+
+function pixelGray(bitmap, offset) {
+  return (Number(bitmap[offset]) + Number(bitmap[offset + 1]) + Number(bitmap[offset + 2])) / 3;
+}
+
+function maskedCorrelation(screenBitmap, templateBitmap, minimumTemplateGray = 12) {
+  let count = 0;
+  let sumScreen = 0;
+  let sumTemplate = 0;
+  let sumScreen2 = 0;
+  let sumTemplate2 = 0;
+  let sumProduct = 0;
+  const length = Math.min(screenBitmap.length, templateBitmap.length);
+  for (let offset = 0; offset + 3 < length; offset += 4) {
+    const templateGray = pixelGray(templateBitmap, offset);
+    const alpha = Number(templateBitmap[offset + 3]);
+    if (alpha < 20 || templateGray < minimumTemplateGray) continue;
+    const screenGray = pixelGray(screenBitmap, offset);
+    count += 1;
+    sumScreen += screenGray;
+    sumTemplate += templateGray;
+    sumScreen2 += screenGray * screenGray;
+    sumTemplate2 += templateGray * templateGray;
+    sumProduct += screenGray * templateGray;
+  }
+  if (count < 50) return -1;
+  const numerator = count * sumProduct - sumScreen * sumTemplate;
+  const denominator = Math.sqrt((count * sumScreen2 - sumScreen ** 2) * (count * sumTemplate2 - sumTemplate ** 2));
+  return denominator > 0 ? numerator / denominator : -1;
+}
+
+async function visualCatalogTemplates() {
+  if (visualCatalogPromise) return visualCatalogPromise;
+  visualCatalogPromise = (async () => {
+    const catalog = await localJson("/api/lcu/visual-catalog");
+    const entities = Array.isArray(catalog.entities) ? catalog.entities : [];
+    const templates = [];
+    const cacheDirectory = path.join(app.getPath("userData"), "visual-icons");
+    fs.mkdirSync(cacheDirectory, { recursive: true });
+    let cursor = 0;
+    const worker = async () => {
+      while (cursor < entities.length) {
+        const entity = entities[cursor++];
+        try {
+          const cachePath = path.join(cacheDirectory, `${String(entity.entityKey).replaceAll(/[^a-z0-9_-]+/gi, "_")}.png`);
+          let bytes;
+          if (fs.existsSync(cachePath)) bytes = fs.readFileSync(cachePath);
+          else {
+            const response = await fetch(entity.iconUrl, { headers: { "User-Agent": "ArenaBuildLab/1.0" } });
+            if (!response.ok) continue;
+            bytes = Buffer.from(await response.arrayBuffer());
+            fs.writeFileSync(cachePath, bytes);
+          }
+          const image = nativeImage.createFromBuffer(bytes);
+          if (image.isEmpty()) continue;
+          const templateSize = entity.kind === "item" ? 64 : 128;
+          templates.push({ entityKey: entity.entityKey, kind: entity.kind, name: entity.name, bitmap: image.resize({ width: templateSize, height: templateSize, quality: "best" }).toBitmap() });
+        } catch { /* One missing icon must not disable the visual catalog. */ }
+      }
+    };
+    await Promise.all(Array.from({ length: 10 }, () => worker()));
+    return templates;
+  })().catch((error) => { visualCatalogPromise = undefined; throw error; });
+  return visualCatalogPromise;
+}
+
+async function matchVisualOffers(thumbnail) {
+  const templates = await visualCatalogTemplates();
+  if (templates.length === 0) return [];
+  const { width, height } = thumbnail.getSize();
+  const centerY = Math.round(height * 0.2935);
+  const matchKind = (kind, normalizedCropSize, templateSize, minimumScore, minimumMargin) => {
+    const kindTemplates = templates.filter((template) => template.kind === kind);
+    const cropSize = Math.max(templateSize, Math.round(width * normalizedCropSize));
+    const results = [];
+    for (const centerXRatio of [0.2945, 0.5, 0.705]) {
+      const crop = thumbnail.crop({ x: Math.round(width * centerXRatio - cropSize / 2), y: Math.round(centerY - cropSize / 2), width: cropSize, height: cropSize }).resize({ width: templateSize, height: templateSize, quality: "best" }).toBitmap();
+      const ranked = kindTemplates.map((template) => ({ ...template, score: maskedCorrelation(crop, template.bitmap, kind === "item" ? 0 : 12) })).sort((left, right) => right.score - left.score);
+      const best = ranked[0];
+      const runnerUp = ranked.find((candidate) => candidate.name !== best?.name);
+      if (!best || best.score < minimumScore || best.score - (runnerUp?.score ?? -1) < minimumMargin) return null;
+      results.push({ entityKey: best.entityKey, name: best.name, score: best.score });
+    }
+    return { kind, matches: results, confidence: Math.min(...results.map((result) => result.score)) };
+  };
+  const augment = matchKind("augment", 0.0933, 128, 0.82, 0.045);
+  const item = matchKind("item", 0.0456, 64, 0.86, 0.08);
+  if (!augment) return item;
+  if (!item) return augment;
+  return augment.confidence >= item.confidence ? augment : item;
+}
+
+function maybeConfirmVisualPick() {
+  if (!visualSession?.closed || !Array.isArray(visualSession.offered) || visualSession.offered.length !== 3 || visualSession.hoverStreak < 2 || visualSession.lastHover < 0) return;
+  const entityKey = visualSession.offered[visualSession.lastHover];
+  const kind = visualSession.kind;
+  resetVisualSession();
+  if (kind === "item") void localJson("/api/lcu/visual-event", "POST", { kind, picked: entityKey }).catch(() => {});
+  else void localJson("/api/lcu/selection", "POST", { entityKey }).catch(() => {});
+}
+
+async function scanVisualOffers(thumbnail, snapshot, session) {
+  visualScanInFlight = true;
+  session.lastScanAt = Date.now();
+  try {
+    const localMatches = await matchVisualOffers(thumbnail);
+    let result;
+    if (localMatches?.matches.length === 3) {
+      const offered = localMatches.matches.map((match) => match.entityKey);
+      await localJson("/api/lcu/visual-event", "POST", { kind: localMatches.kind, offered });
+      result = { offered, kind: localMatches.kind };
+    } else {
+      const size = thumbnail.getSize();
+      const width = Math.min(1600, size.width);
+      const image = width < size.width ? thumbnail.resize({ width, quality: "best" }) : thumbnail;
+      const screenshotDataUrl = `data:image/jpeg;base64,${image.toJPEG(72).toString("base64")}`;
+      result = await localJson("/api/lcu/visual-scan", "POST", { screenshotDataUrl, sequence: snapshot.sequence });
+      result.kind = "augment";
+    }
+    if (visualSession === session) {
+      session.offered = result.offered;
+      session.kind = result.kind;
+      maybeConfirmVisualPick();
+    }
+  } catch {
+    if (visualSession === session && session.closed) resetVisualSession();
+  } finally { visualScanInFlight = false; }
+}
+
+async function pollVisualAugmentSelection() {
+  if (visualPollBusy) return;
+  visualPollBusy = true;
+  try {
+    const snapshot = await localJson("/api/lcu/status?once=1");
+    if (!snapshot.supportsAugments || !["in_progress", "augment_select"].includes(snapshot.phase)) {
+      resetVisualSession();
+      return;
+    }
+    const cursorPoint = screen.getCursorScreenPoint();
+    const display = screen.getDisplayNearestPoint(cursorPoint);
+    const sources = await desktopCapturer.getSources({ types: ["screen"], thumbnailSize: display.size });
+    const source = sources.find((candidate) => String(candidate.display_id) === String(display.id)) || sources[0];
+    if (!source || source.thumbnail.isEmpty()) return;
+    const thumbnail = source.thumbnail;
+    const size = thumbnail.getSize();
+    const detected = detectAugmentSelectionFrame(thumbnail.toBitmap(), size.width, size.height);
+    if (detected) {
+      visualMissingFrames = 0;
+      visualDetectedFrames += 1;
+      if (!visualSession) visualSession = { offered: null, lastHover: -1, hoverStreak: 0, closed: false, startedAt: Date.now(), lastScanAt: 0 };
+      const hover = cardIndexAtPoint(cursorPoint, display.bounds);
+      if (hover >= 0 && hover === visualSession.lastHover) visualSession.hoverStreak += 1;
+      else { visualSession.lastHover = hover; visualSession.hoverStreak = hover >= 0 ? 1 : 0; }
+      if (visualDetectedFrames >= 2 && !visualSession.offered && !visualScanInFlight && Date.now() - visualSession.lastScanAt > 3_000) {
+        void scanVisualOffers(thumbnail, snapshot, visualSession);
+      }
+      return;
+    }
+    visualDetectedFrames = 0;
+    if (!visualSession) return;
+    visualMissingFrames += 1;
+    if (visualMissingFrames >= 2) {
+      visualSession.closed = true;
+      maybeConfirmVisualPick();
+      if (!visualScanInFlight && visualSession) resetVisualSession();
+    }
+  } catch {
+    // League and the local server are expected to disappear between sessions.
+  } finally { visualPollBusy = false; }
+}
+
+function startVisualAugmentWatcher() {
+  clearInterval(visualWatcherTimer);
+  visualWatcherTimer = setInterval(() => void pollVisualAugmentSelection(), 750);
+}
+
 function startOverwolfAugmentProvider() {
   const gep = app.overwolf?.packages?.gep;
   if (!gep) return false;
@@ -339,6 +556,8 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
   createDashboardWindow();
   createTray();
   startOverwolfAugmentProvider();
+  void visualCatalogTemplates().catch(() => {});
+  startVisualAugmentWatcher();
   globalShortcut.register("CommandOrControl+Shift+A", () => void capturePicker());
   app.setLoginItemSettings({ openAtLogin: saved.openAtLogin });
 });
@@ -347,6 +566,7 @@ app.on("window-all-closed", () => {});
 app.on("will-quit", () => {
   if (windowMode === "overlay" && mainWindow && !mainWindow.isDestroyed()) writeSettings({ overlayBounds: mainWindow.getBounds() });
   clearTimeout(boundsSaveTimer);
+  clearInterval(visualWatcherTimer);
   globalShortcut.unregisterAll();
   if (serverProcess) serverProcess.kill();
 });

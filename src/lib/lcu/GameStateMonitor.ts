@@ -34,6 +34,7 @@ export type GameStateSnapshot = {
   lobbyMembers: Array<{ puuid: string; gameName: string; tagLine: string; rank?: string }>;
   currentEntityRefs: string[];
   offeredAugmentRefs: string[];
+  offeredItemRefs: string[];
   liveStats: LiveChampionStats | null;
   offerFeed: {
     status: "waiting" | "detected" | "not_exposed";
@@ -313,7 +314,7 @@ export class GameStateMonitor extends EventEmitter {
   private running = false;
   private refreshing = false;
   private sequence = 0;
-  private offers: { refs: string[]; sourceUri: string; detectedAt: string; expiresAt: number } | null = null;
+  private offers: { refs: string[]; kind: "augment" | "item"; sourceUri: string; detectedAt: string; expiresAt: number } | null = null;
   private selectedAugments = new Set<string>();
   private observedCandidateUris = new Set<string>();
   private liveObservation: LiveObservationInput | null = null;
@@ -332,6 +333,7 @@ export class GameStateMonitor extends EventEmitter {
     lobbyMembers: [],
     currentEntityRefs: [],
     offeredAugmentRefs: [],
+    offeredItemRefs: [],
     liveStats: null,
     offerFeed: { status: "waiting", sourceUri: "", detectedAt: "", note: "Waiting for Arena or ARAM: Mayhem.", observedCandidateUris: [] },
     updatedAt: new Date().toISOString(),
@@ -369,7 +371,22 @@ export class GameStateMonitor extends EventEmitter {
   ingestProviderOffers(references: string[], source = "provider://augments"): boolean {
     const normalized = unique(references.map(normalizedAugmentRef));
     if (normalized.length !== 3 || !this.snapshotValue.supportsAugments) return false;
-    this.offers = { refs: normalized, sourceUri: source, detectedAt: new Date().toISOString(), expiresAt: Date.now() + 45_000 };
+    this.offers = { refs: normalized, kind: "augment", sourceUri: source, detectedAt: new Date().toISOString(), expiresAt: Date.now() + 45_000 };
+    void this.refresh();
+    return true;
+  }
+
+  ingestProviderItems(references: string[], source = "vision://items"): boolean {
+    const normalized = unique(references.map((reference) => String(reference).trim() || null));
+    if (normalized.length !== 3 || !this.snapshotValue.supportsAugments) return false;
+    this.offers = { refs: normalized, kind: "item", sourceUri: source, detectedAt: new Date().toISOString(), expiresAt: Date.now() + 45_000 };
+    void this.refresh();
+    return true;
+  }
+
+  confirmItemSelection(reference: string): boolean {
+    if (!this.offers || this.offers.kind !== "item" || !this.offers.refs.includes(reference)) return false;
+    this.offers = null;
     void this.refresh();
     return true;
   }
@@ -396,7 +413,7 @@ export class GameStateMonitor extends EventEmitter {
     }
     const offers = extractOfferedAugmentRefs(event.uri, event.data);
     if (offers.length === 3) {
-      this.offers = { refs: offers, sourceUri: event.uri, detectedAt: new Date().toISOString(), expiresAt: Date.now() + 90_000 };
+      this.offers = { refs: offers, kind: "augment", sourceUri: event.uri, detectedAt: new Date().toISOString(), expiresAt: Date.now() + 90_000 };
     }
     if (offers.length !== 3 && /(augment|cherry|perk|mayhem|card|kiwi)/i.test(event.uri) && !/(catalog|game-data\/assets)/i.test(event.uri)) {
       const selected = extractOwnedAugmentRefs({ arena: event.data });
@@ -443,11 +460,14 @@ export class GameStateMonitor extends EventEmitter {
       liveAugments.forEach((reference) => this.selectedAugments.add(reference));
       const currentEntityRefs = live ? unique([...extractTrackableItemRefs(live), ...this.selectedAugments]) : [...this.selectedAugments];
       if (this.offers && this.offers.refs.some((offer) => currentEntityRefs.includes(offer))) this.offers = null;
-      const offeredAugmentRefs = this.offers?.refs ?? [];
-      const phase = normalizedPhase(rawPhase, supportsAugments, offeredAugmentRefs, Boolean(live), Boolean(this.offers?.sourceUri.startsWith("overwolf://")));
+      const offeredAugmentRefs = this.offers?.kind === "augment" ? this.offers.refs : [];
+      const offeredItemRefs = this.offers?.kind === "item" ? this.offers.refs : [];
+      const offeredRefs = this.offers?.refs ?? [];
+      const trustedOfferSource = Boolean(this.offers?.sourceUri.startsWith("overwolf://") || this.offers?.sourceUri.startsWith("vision://"));
+      const phase = normalizedPhase(rawPhase, supportsAugments, offeredRefs, Boolean(live), trustedOfferSource);
       const members = await this.enrichLobbyMembers(lobbyMembers(lobby, champSelect), connection.connected);
       const championId = livePlayer.name ? null : championFromSelect(champSelect);
-      const offerStatus = offeredAugmentRefs.length === 3 ? "detected" : supportsAugments && phase === "in_progress" ? "not_exposed" : "waiting";
+      const offerStatus = offeredRefs.length === 3 ? "detected" : supportsAugments && phase === "in_progress" ? "not_exposed" : "waiting";
       if (supportsAugments && livePlayer.stats) {
         const previous = this.liveObservation;
         this.liveObservation = {
@@ -484,13 +504,14 @@ export class GameStateMonitor extends EventEmitter {
         lobbyMembers: members,
         currentEntityRefs,
         offeredAugmentRefs,
+        offeredItemRefs,
         liveStats: livePlayer.stats,
         offerFeed: {
           status: offerStatus,
           sourceUri: this.offers?.sourceUri ?? "",
           detectedAt: this.offers?.detectedAt ?? "",
           note: offerStatus === "detected"
-            ? "Three augment offers were read from a local client event."
+            ? this.offers?.kind === "item" ? "Three item offers were read from the local visual provider." : "Three augment offers were read from a local provider."
             : offerStatus === "not_exposed"
               ? `The published local-client schemas did not expose this ${mode === "aram_mayhem" ? "Mayhem" : "Arena"} offer. Candidate events are still monitored.`
               : "Waiting for an in-game augment offer event.",

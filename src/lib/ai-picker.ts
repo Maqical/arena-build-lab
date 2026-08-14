@@ -45,7 +45,7 @@ async function extractScreenshotAugments(dataUrl: string, augmentNames: string[]
     throw new Error("Screenshot must be a PNG, JPEG, or WebP under approximately 6 MB.");
   }
   const { data } = await openAIJson<{ options: Array<{ name: string }> }>([
-    { role: "developer", content: "Read only the three offered League of Legends Arena augments or ARAM: Mayhem cards. Ignore all other UI text and never invent an option." },
+    { role: "developer", content: "Read only the three offered League of Legends Arena augments or ARAM: Mayhem cards. Return them in left-to-right screen order, ignore all other UI text, and never invent an option." },
     { role: "user", content: [
       { type: "input_text", text: `Return exactly three names from this allowed catalog:\n${augmentNames.join("\n")}` },
       { type: "input_image", image_url: dataUrl, detail: "low" },
@@ -90,8 +90,8 @@ export async function evaluateAIPicker(request: AIPickerRequest): Promise<AIPick
   const mode = request.mode ?? "arena";
   const augmentRows = db.prepare(`
     SELECT entity_key, numeric_id, name FROM entities
-    WHERE kind='augment' AND ((?='aram_mayhem' AND numeric_id>=1000) OR (?='arena' AND numeric_id<1000))
-    ORDER BY name, numeric_id
+    WHERE kind='augment'
+    ORDER BY name, CASE WHEN (?='aram_mayhem' AND numeric_id>=1000) OR (?='arena' AND numeric_id<1000) THEN 0 ELSE 1 END, numeric_id
   `).all(mode, mode) as Array<{ entity_key: string; numeric_id: number; name: string }>;
   let offeredKeys = [...new Set(request.offeredAugmentKeys ?? [])];
   let screenshotExtracted = false;

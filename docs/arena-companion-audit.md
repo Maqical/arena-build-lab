@@ -36,7 +36,7 @@ Overwolf's documented League feature set includes:
 - `picked_augment`: the most recently selected augment;
 - `live_client_data`, item, match, and game-state updates used by companion interfaces.
 
-Arena Build Lab v1.0.4 contains a provider-neutral parser, endpoint, and Electron bridge for those payloads. The standard Electron installer does not host the Overwolf runtime; activating that feed is the first milestone of the dedicated Overwolf Electron target.
+Arena Build Lab v1.0.5 contains provider-neutral structured and local-visual selection adapters. The standard Electron build can now recognize the verified three-card layout locally; the Overwolf Electron target remains an additional structured-event distribution path.
 
 This distinction is architectural, not a product-policy question: structured provider events are preferred when present, and local visual/manual providers feed the identical internal selection pipeline when they are not.
 

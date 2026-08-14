@@ -4,11 +4,11 @@ Arena Build Lab is a Windows companion for League of Legends Arena and ARAM: May
 
 It combines live game context, automatic and assisted augment intake, recursive stat-conversion math, champion-specific build guidance, personal match history, and a local match warehouse. The application is read-only: it observes supported game/client data and never controls gameplay.
 
-Current desktop version: **v1.0.4**
+Current desktop version: **v1.0.5**
 
 ## Install
 
-Run `Arena-Build-Lab-1.0.4-Setup.exe`. The installer creates Start Menu and desktop shortcuts and preserves the local warehouse under `%APPDATA%\Arena Build Lab` during upgrades.
+Run `Arena-Build-Lab-1.0.5-Setup.exe`. The installer creates Start Menu and desktop shortcuts and preserves the local warehouse under `%APPDATA%\Arena Build Lab` during upgrades.
 
 On first launch:
 
@@ -25,7 +25,8 @@ Arena Build Lab uses a provider pipeline rather than coupling the UI to one data
 
 - **Overwolf Game Events Provider:** documented Mayhem `augments` and `picked_augment` events flow through the provider bridge into the overlay, owned-augment state, recommendations, and resolver.
 - **League local surfaces:** LCU and Live Client Data provide connection state, phase, champion, level, live stats, items, and any augment information present in the payload.
-- **Desktop capture fallback:** `Ctrl+Shift+A` opens the screenshot picker. Confirm the detected choice with `1`, `2`, or `3` to push it into the same owned-augment pipeline.
+- **Local visual provider:** while a supported match is active, Electron watches only for the stable three-card selection layout, identifies augment and Prismatic item icons against the local catalog, and sends the three choices into the overlay automatically. Frames are not retained unless diagnostics are explicitly enabled.
+- **Assisted fallback:** `Ctrl+Shift+A` opens the screenshot picker when a visual match is uncertain. Confirm the detected choice with `1`, `2`, or `3` to push it into the same owned-augment pipeline.
 - **Manual fallback:** select the three offers directly when neither event nor image input is available. Local stat comparisons do not require an AI key.
 
 Every source normalizes to the same internal selection IDs. The HUD records which provider supplied a choice, updates item recommendations for the current champion and selected augment set, and re-runs the stat resolver.
@@ -37,6 +38,7 @@ The next implementation milestones and release gates live in [ROADMAP.md](ROADMA
 - Command Center with client status, player-facing patch, warehouse health, recent matches, and trophy previews.
 - Always-on-top live overlay with persistent position, adjustable opacity/scale, reconnect handling, and OBS mode.
 - Live champion, level, HP, AD, AP, attack speed, items, augment state, and resolver-powered Craze Factor.
+- Automatic three-card augment and Prismatic-item recognition with per-choice stat deltas, a highlighted pick, and champion-specific continuation paths.
 - Fixed-point stat resolver with convergence/divergence diagnostics and reproducible scenario inputs.
 - Extreme Build Browser for health, AD, AP, attack speed, haste, movement speed, crit damage, and on-hit objectives.
 - Champion-plus-augment item recommendations derived from the local participant cohort; low samples are labelled rather than replaced with unrelated global items.

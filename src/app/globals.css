@@ -213,9 +213,10 @@ button { color: inherit; }
 }
 .field { min-width: 0; }
 .field label { display: block; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; }
-.select-wrap { min-width: 0; height: 46px; display: flex; align-items: center; gap: 8px; background: rgba(7,5,12,0.55); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; }
+.select-wrap { min-width: 0; height: 46px; display: flex; align-items: center; gap: 8px; overflow: hidden; background: rgba(7,5,12,0.55); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; }
 .select-wrap img { border-radius: 5px; }
 .select-wrap select, .search-field input { min-width: 0; max-width: 100%; width: 100%; color: var(--ink); background: transparent; border: 0; outline: 0; }
+.select-wrap select { flex: 1 1 0; width: 0; }
 .select-wrap select option { background: #15101f; }
 .search-field input { height: 46px; border: 1px solid var(--line); border-radius: 8px; background: rgba(7,5,12,0.55); padding: 0 14px; }
 .search-field input:focus, .select-wrap:focus-within { border-color: rgba(196, 173, 255, 0.6); box-shadow: 0 0 0 3px rgba(157,120,255,0.08); }
@@ -596,6 +597,15 @@ footer { color: #5f5868; font-size: 10px; text-align: center; margin-top: 42px; 
 .overlay-verdict span { color: var(--violet-bright); font-size: 7px; text-transform: uppercase; }
 .overlay-verdict strong { display: block; margin-top: 3px; overflow-wrap: anywhere; color: #fff; font-size: 17px; line-height: 1.5; }
 .overlay-verdict p, .overlay-offer-wait p { margin: 4px 0 0; overflow-wrap: anywhere; white-space: normal; color: #b4aabd; font-size: 15px; line-height: 1.5; }
+.prismatic-picker article { grid-template-columns: 1fr; align-items: stretch; padding: 9px; }
+.prismatic-item-heading { display: flex !important; flex-direction: row !important; align-items: center; gap: 9px !important; }
+.prismatic-item-heading > div { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.prismatic-item-heading img { flex: 0 0 auto; border: 1px solid rgba(196,151,255,.45); }
+.prismatic-item-heading small { color: #b99fea; font-size: 12px; line-height: 1.4; }
+.prismatic-deltas { display: flex !important; flex-flow: row wrap !important; gap: 5px !important; }
+.prismatic-deltas span { padding: 3px 6px; border: 1px solid rgba(110,229,167,.16); border-radius: 999px; background: rgba(110,229,167,.06); color: #8af1b9 !important; font: 12px/1.3 var(--font-geist-mono), monospace !important; text-transform: none !important; }
+.prismatic-path { margin: 2px 0 0; color: #c8bdcf; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.prismatic-source-note { display: block; margin-top: 7px; color: #9e92a7; font-size: 11px; line-height: 1.45; }
 .overlay-offer-wait { padding: 10px; }
 .overlay-offer-wait span { color: var(--gold); font-size: 9px; font-weight: 650; }
 .overlay-stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }

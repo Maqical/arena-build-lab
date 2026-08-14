@@ -1,6 +1,6 @@
 # Arena Build Lab Master Roadmap
 
-This is the authoritative implementation plan after v1.0.4. Issues and release work should link back to one of the milestones below instead of creating parallel plans.
+This is the authoritative implementation plan after v1.0.5. Issues and release work should link back to one of the milestones below instead of creating parallel plans.
 
 ## Product objective
 
@@ -13,17 +13,17 @@ Turn live Arena and ARAM: Mayhem state into an immediate, explainable answer to 
 
 The companion remains read-only. Automatic observation is in scope; automated gameplay input is not.
 
-## Current baseline — v1.0.4
+## Current baseline — v1.0.5
 
 - Windows Electron installer, tray integration, persistent overlay placement, and automatic LCU reconnection.
 - Command Center, live view, overlay, Build Lab, history, trophies, extreme builds, and settings.
 - LCU/Live Client state for phase, champion, stats, and items.
-- Manual and screenshot-assisted three-choice augment selection.
+- Local three-card visual recognition for augment and Prismatic-item offers, plus manual and screenshot-assisted fallbacks.
 - Provider-neutral augment parser and local provider-event endpoint.
 - Tested parsing for Overwolf's documented Mayhem `augments` and `picked_augment` payloads.
 - Immutable 1,075-match local warehouse with 18,438 participant rows.
 - Player-facing patch labels separated from raw Data Dragon build versions.
-- Fixed-point resolver, extreme-build search, conditional item recommendations, and uncatalogued-ID handling.
+- Fixed-point resolver, extreme-build search, conditional item recommendations, Prismatic choice comparison, and uncatalogued-ID handling.
 
 ## Milestone 1 — Automatic Mayhem augment intake
 
@@ -67,18 +67,19 @@ Goal: determine and implement the best automatic Arena selection source without 
 - A real selection, regardless of source, produces the same canonical augment ID and resolver result.
 - Sanitized replay tests cover every verified Arena payload shape.
 
-## Milestone 3 — Local visual augment provider
+## Milestone 3 — Local visual selection provider (implemented; validation expansion remains)
 
 Goal: provide standalone automatic detection when no structured event feed is available.
 
 ### Tasks
 
 - Collect sanitized screenshots for supported resolutions, display scaling, UI scaling, and languages.
-- Detect the three card regions locally before running OCR/classification.
-- Match card title plus icon fingerprint against the local catalog; require confidence thresholds and temporal agreement across frames.
+- Detect the three card regions locally before classification. **Implemented.**
+- Match augment and Prismatic item icon fingerprints against the local catalog; require confidence thresholds and temporal agreement across frames. **Implemented for the current 16:9 card layout.**
 - Process only while a supported game is active and a selection-screen signature is present.
 - Keep pixels ephemeral by default; store only opt-in sanitized diagnostics.
-- Emit the same provider-neutral offer/pick events used by Overwolf and manual input.
+- Emit the same provider-neutral offer/pick events used by Overwolf and manual input. **Implemented.**
+- Expand the sanitized validation set across resolutions, display/UI scaling, languages, and multi-monitor arrangements.
 - Display uncertain matches for one-click confirmation instead of silently choosing.
 
 ### Acceptance gate
@@ -175,4 +176,3 @@ Then verify:
 - `ROADMAP.md`: authoritative future plan and acceptance gates.
 - `RELEASE_NOTES.md`: shipped behavior only.
 - `docs/arena-companion-audit.md`: dated technical evidence and provider findings.
-

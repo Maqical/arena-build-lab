@@ -13,7 +13,7 @@ data/extreme-builds-*.csv
 data/extreme_builds.csv
 data/cache/
 *.log
-logs/lcu_dump*.json
+logs/
 *.tsbuildinfo
 .env*
 !.env.example

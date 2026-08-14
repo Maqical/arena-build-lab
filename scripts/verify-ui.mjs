@@ -153,6 +153,21 @@ try {
   assert(overlayDimensions.component <= 450);
   await overlayPage.screenshot({ path: path.join(output, "live-overlay-demo.png"), fullPage: true });
 
+  const prismaticPage = await browser.newPage({ viewport: { width: 450, height: 720 }, deviceScaleFactor: 1 });
+  prismaticPage.on("pageerror", (error) => errors.push(error.message));
+  prismaticPage.on("response", (response) => {
+    if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`);
+  });
+  await prismaticPage.goto("http://localhost:3000/overlay?demo=prismatic", { waitUntil: "domcontentloaded" });
+  await prismaticPage.getByText("Choose a Prismatic item", { exact: true }).waitFor();
+  await prismaticPage.getByText("Prismatic item choice", { exact: true }).waitFor();
+  assert.equal(await prismaticPage.locator(".prismatic-picker article").count(), 3);
+  assert.equal(await prismaticPage.locator(".prismatic-picker .prismatic-path").count(), 3);
+  await prismaticPage.locator(".prismatic-picker .overlay-verdict").waitFor();
+  await prismaticPage.getByText("Recommended path", { exact: true }).waitFor();
+  await prismaticPage.waitForFunction(() => Promise.all([...document.images].map((image) => image.decode().catch(() => undefined))));
+  await prismaticPage.screenshot({ path: path.join(output, "prismatic-picker-overlay.png"), fullPage: true });
+
   const extremePage = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
   extremePage.on("pageerror", (error) => errors.push(error.message));
   await extremePage.goto("http://localhost:3000/extreme-builds", { waitUntil: "domcontentloaded" });
@@ -236,6 +251,7 @@ try {
     overlayOffers: 3,
     overlayImagesLoaded: overlayImageStates.filter((image) => image.loaded).length,
     overlayImagesTotal: overlayImageStates.length,
+    prismaticOffers: await prismaticPage.locator(".prismatic-picker article").count(),
     sionExtremeRows,
     championSelectDuos: await championSelectPage.locator(".champ-duos article").count(),
     championSelectAugments: await championSelectPage.locator(".champ-picks article").count(),

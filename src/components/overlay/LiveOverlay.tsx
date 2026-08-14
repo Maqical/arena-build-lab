@@ -7,6 +7,7 @@ import { ItemAssistant } from "@/components/overlay/ItemAssistant";
 import { LiveGameHUD } from "@/components/overlay/LiveGameHUD";
 import { LobbyScanner } from "@/components/overlay/LobbyScanner";
 import { PostGameAnalysis } from "@/components/overlay/PostGameAnalysis";
+import { PrismaticItemPicker } from "@/components/overlay/PrismaticItemPicker";
 import { ScreenshotPickerControl } from "@/components/overlay/ScreenshotPickerControl";
 import type { AIPickerResponse } from "@/lib/ai-picker-types";
 import type { GameStateSnapshot } from "@/lib/lcu/GameStateMonitor";
@@ -37,6 +38,7 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
 
 function phaseLabel(snapshot: GameStateSnapshot | null): string {
   if (!snapshot) return "Finding League";
+  if (snapshot.offeredItemRefs.length === 3) return "Choose a Prismatic item";
   const modeName = snapshot.mode === "aram_mayhem" ? "Mayhem" : "Arena";
   const labels: Record<GameStateSnapshot["phase"], string> = {
     disconnected: "League closed",
@@ -50,8 +52,9 @@ function phaseLabel(snapshot: GameStateSnapshot | null): string {
   return labels[snapshot.phase];
 }
 
-function demoSnapshot(entities: OverlayCatalogEntity[], champions: Champion[], phase: "augment_select" | "champ_select" | "in_progress" | "disconnected" = "augment_select", includeUncatalogued = false): GameStateSnapshot {
+function demoSnapshot(entities: OverlayCatalogEntity[], champions: Champion[], phase: "augment_select" | "champ_select" | "in_progress" | "disconnected" = "augment_select", includeUncatalogued = false, showPrismaticOffers = false): GameStateSnapshot {
   const offered = ["Goliath", "Tank Engine", "Mind to Matter"].map((name) => entities.find((entity) => entity.name === name)?.entityKey ?? "").filter(Boolean);
+  const offeredItems = ["Radiant Virtue", "Flesheater", "Pyromancer's Cloak"].map((name) => entities.find((entity) => entity.name === name)?.entityKey ?? "").filter(Boolean);
   const sion = champions.find((champion) => champion.key === "Sion");
   return {
     sequence: 1,
@@ -65,13 +68,14 @@ function demoSnapshot(entities: OverlayCatalogEntity[], champions: Champion[], p
     queueName: "Arena demo",
     champion: { id: phase === "disconnected" ? null : sion?.id ?? 14, name: phase === "disconnected" ? "" : "Sion", level: phase === "champ_select" ? 1 : 18 },
     lobbyMembers: [],
-    currentEntityRefs: phase === "champ_select" || phase === "disconnected" ? [] : [entities.find((entity) => entity.name === "Overlord's Bloodmail")?.entityKey ?? "", ...(includeUncatalogued ? ["augment:999999"] : [])].filter(Boolean),
-    offeredAugmentRefs: phase === "augment_select" ? offered : [],
+    currentEntityRefs: phase === "champ_select" || phase === "disconnected" ? [] : [entities.find((entity) => entity.name === "Overlord's Bloodmail")?.entityKey ?? "", ...(showPrismaticOffers ? [entities.find((entity) => entity.name === "Goliath")?.entityKey ?? ""] : []), ...(includeUncatalogued ? ["augment:999999"] : [])].filter(Boolean),
+    offeredAugmentRefs: phase === "augment_select" && !showPrismaticOffers ? offered : [],
+    offeredItemRefs: phase === "augment_select" && showPrismaticOffers ? offeredItems : [],
     liveStats: phase === "champ_select" || phase === "disconnected" ? null : { currentHealth: 11_400, maxHealth: 16_300, attackDamage: 630, abilityPower: 0, attackSpeed: 0.91, armor: 171, magicResistance: 103, moveSpeed: 345, abilityHaste: 25 },
     offerFeed: phase === "champ_select"
       ? { status: "waiting", sourceUri: "", detectedAt: "", note: "Champion Select demo.", observedCandidateUris: [] }
       : phase === "augment_select"
-        ? { status: "detected", sourceUri: "demo://augment-offers", detectedAt: new Date().toISOString(), note: "Demo offer event.", observedCandidateUris: [] }
+        ? { status: "detected", sourceUri: showPrismaticOffers ? "demo://prismatic-offers" : "demo://augment-offers", detectedAt: new Date().toISOString(), note: "Demo offer event.", observedCandidateUris: [] }
         : { status: "not_exposed", sourceUri: "", detectedAt: "", note: "Screenshot-picker demo.", observedCandidateUris: [] },
     updatedAt: new Date().toISOString(),
   };
@@ -106,6 +110,12 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
       .map((ref) => entityLookup.get(normalized(ref)))
       .filter((entity): entity is OverlayCatalogEntity => entity?.kind === "augment"),
     [entityLookup, snapshot?.offeredAugmentRefs],
+  );
+  const offeredItems = useMemo(
+    () => (snapshot?.offeredItemRefs ?? [])
+      .map((ref) => entityLookup.get(normalized(ref)))
+      .filter((entity): entity is OverlayCatalogEntity => entity?.kind === "item"),
+    [entityLookup, snapshot?.offeredItemRefs],
   );
   const detectedEntities = useMemo(
     () => (snapshot?.currentEntityRefs ?? [])
@@ -148,16 +158,16 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
   }, [entityLookup, offered, recommendation]);
   const manualSelections = useMemo(
     () => entities
-      .filter((entity) => entity.kind === "augment" && (snapshot?.mode === "aram_mayhem" ? entity.numericId >= 1000 : entity.numericId < 1000))
+      .filter((entity) => entity.kind === "augment")
       .sort((left, right) => left.name.localeCompare(right.name)),
-    [entities, snapshot?.mode],
+    [entities],
   );
 
   useEffect(() => {
     const demo = new URLSearchParams(window.location.search).get("demo");
-    if (demo === "1" || demo === "champ-select" || demo === "screenshot" || demo === "disconnected" || demo === "uncatalogued") {
+    if (demo === "1" || demo === "prismatic" || demo === "champ-select" || demo === "screenshot" || demo === "disconnected" || demo === "uncatalogued") {
       const timer = window.setTimeout(() => {
-        setSnapshot(demoSnapshot(entities, champions, demo === "champ-select" ? "champ_select" : demo === "screenshot" || demo === "uncatalogued" ? "in_progress" : demo === "disconnected" ? "disconnected" : "augment_select", demo === "uncatalogued"));
+        setSnapshot(demoSnapshot(entities, champions, demo === "champ-select" ? "champ_select" : demo === "screenshot" || demo === "uncatalogued" ? "in_progress" : demo === "disconnected" ? "disconnected" : "augment_select", demo === "uncatalogued", demo === "prismatic"));
         setConnectionState("live");
       }, 0);
       return () => window.clearTimeout(timer);
@@ -245,7 +255,9 @@ export function LiveOverlay({ champions, entities, meta }: { champions: Champion
         <LiveGameHUD snapshot={snapshot} build={liveBuild} augments={currentEntities.filter((entity) => entity.kind === "augment")} items={currentEntities.filter((entity) => entity.kind === "item")} unresolvedAugmentRefs={unresolvedAugmentRefs} />
         <ItemAssistant championId={champion?.id ?? snapshot.champion.id} augments={currentEntities.filter((entity) => entity.kind === "augment")} />
         {recommendation?.screenshotExtracted && <section className="overlay-offers screenshot-confirm"><div className="overlay-section-title"><span>Screenshot {snapshot.mode === "aram_mayhem" ? "cards" : "offers"}</span><b>Press 1 / 2 / 3 to confirm</b></div>{recommendation.options.map((option, index) => <button type="button" className={scannedAugmentKeys.includes(option.entity.entityKey) ? "confirmed" : ""} onClick={() => confirmScannedPick(option.entity.entityKey)} key={option.entity.entityKey}><span>{index + 1}</span><strong>{option.entity.name}</strong><small>{option.entity.entityKey === recommendation.recommendation.entityKey ? "Recommended" : "Mark chosen"}</small></button>)}<div className="overlay-verdict"><span>AI recommendation</span><strong>{recommendation.recommendation.name}</strong><p>{recommendation.recommendation.rationale}</p></div></section>}
-      </> : snapshot?.phase === "post_game" ? <PostGameAnalysis championName={snapshot.champion.name} /> : snapshot?.phase === "augment_select" || displayedOffers.length > 0 ? (
+      </> : snapshot?.phase === "post_game" ? <PostGameAnalysis championName={snapshot.champion.name} /> : offeredItems.length === 3 ? (
+        <PrismaticItemPicker championId={champion?.id ?? snapshot.champion.id} level={snapshot.champion.level} currentEntityKeys={currentEntities.map((entity) => entity.entityKey)} offers={offeredItems} />
+      ) : snapshot?.phase === "augment_select" || displayedOffers.length > 0 ? (
         <section className="overlay-offers">
           <div className="overlay-section-title"><span>{recommendation?.screenshotExtracted && offered.length === 0 ? "Screenshot offers" : "Auto-detected offers"}</span><b>{recommendation ? "Ranked" : "Analyzing…"}</b></div>
           {displayedOffers.map((entity, index) => {
