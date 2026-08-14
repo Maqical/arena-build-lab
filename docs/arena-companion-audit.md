@@ -1,63 +1,77 @@
-# Arena companion audit — 2026-08-13
+# Arena companion technical audit — 2026-08-13
 
-## Repository feedback
+## Companion product patterns
 
-GitHub currently reports no issues, pull requests, reviews, or commit comments for this repository. The latest `CI / verify` run is green. Earlier red checks remain attached to their historical commits and were caused by a stale Electron dependency lockfile.
+Public companion products organize around the same useful loop: identify the current player and game phase, provide champion-specific context, observe live state, and turn post-game records into future recommendations. Arena Build Lab follows that model while differentiating itself through conversion math, extreme-build discovery, local provenance, and provider-neutral augment intake.
 
-## What public companion pages actually provide
+### Meta and build products
 
-### MetaSRC
+- **MetaSRC** exposes champion, augment, item, prismatic, and duo views, including a conditional augment-build concept. Arena Build Lab implements the useful query locally as `champion + selected augment set -> observed items for matching participants`.
+- **U.GG** presents champion-specific Arena items, augments, and duos. Its public pages establish the expected product shape; they do not need to be a runtime dependency.
+- **Blitz** provides global augment and champion-specific Arena views with placement, appearance, prismatic, and item statistics.
+- **Porofessor** demonstrates the fast lobby, multi-search, match-history, and desktop-overlay workflow expected from a modern companion.
+- **Overwolf** supplies a documented Game Events Provider used by desktop companions to receive supported game events without coupling UI code directly to client internals.
 
-The current champion page provides patch, region and rank filters; champion placement/pick data; augment rarity/tier/pick tables; item choices by round; prismatic choices; and a UI labelled “Select an augment build.” That last selector is the closest public analogue to Arena Build Lab's desired conditional query. The reliable product behavior should be modeled as:
+References:
 
-`champion + selected augment set -> observed items for matching participants`
+- https://www.metasrc.com/lol/arena/champions/riven/build
+- https://u.gg/lol/champions/arena/LUX-arena-build
+- https://blitz.gg/lol/arena/augments
+- https://porofessor.gg/
+- https://dev.overwolf.com/ow-electron/live-game-data-gep/supported-games/league-of-legends/
 
-Source: https://www.metasrc.com/lol/arena/champions/riven/build
+## Verified live-data findings
 
-### U.GG
+### League local surfaces
 
-Public Arena champion pages advertise champion-specific items, augments and duos. Direct automated retrieval is Cloudflare/robots restricted, so this audit does not claim an internal implementation or hidden endpoint. Its visible model is primarily champion-level build guidance.
+LCU and Live Client Data reliably provide connection/gameflow state and, while a game is active, champion, level, live stats, and inventory. Captured Arena and Mayhem sessions did not expose a complete, stable ordinary array for the three offered cards and selected augments. Spell-granting augments can appear indirectly, but that is not a complete selection feed.
 
-Source: https://u.gg/lol/champions/arena/LUX-arena-build
+`npm run audit:lcu -- --duration=60 --interval=5` records the available LCU gameflow and Live Client payloads to gitignored diagnostics for new-patch comparison.
 
-### Blitz
+### Overwolf event provider
 
-Blitz exposes a global augment table and champion-specific Arena pages with placement, appearance, prismatic and item statistics. Its indexed pages demonstrate separate champion, augment and item views, but do not prove that its item list is conditionally recalculated for an arbitrary selected augment set.
+Overwolf's documented League feature set includes:
 
-Sources: https://blitz.gg/lol/arena/augments and https://blitz.gg/lol/champions/camille/arena
+- `augments`: the three available ARAM: Mayhem augments;
+- `picked_augment`: the most recently selected augment;
+- `live_client_data`, item, match, and game-state updates used by companion interfaces.
 
-### Porofessor
+Arena Build Lab v1.0.4 contains a provider-neutral parser, endpoint, and Electron bridge for those payloads. The standard Electron installer does not host the Overwolf runtime; activating that feed is the first milestone of the dedicated Overwolf Electron target.
 
-Porofessor visibly supports live lookup, lobby paste/multi-search, regions and a desktop companion. Its public homepage does not provide evidence of an Arena-specific “items given augment” selector, so this project should borrow its fast lobby workflow—not attribute unverified Arena-selection behavior to it.
+This distinction is architectural, not a product-policy question: structured provider events are preferred when present, and local visual/manual providers feed the identical internal selection pipeline when they are not.
 
-Source: https://porofessor.gg/
+References:
 
-## How augment detection differs by platform
+- https://dev.overwolf.com/ow-electron/live-game-data-gep/supported-games/league-of-legends/
+- https://dev.overwolf.com/ow-electron/reference/game-events/
+- https://dev.overwolf.com/ow-electron/getting-started/develop-your-idea/
 
-Our captured Arena game returned:
+## Implemented data path
 
-- LCU gameflow phase: `InProgress`
-- Live Client mode: `CHERRY`
-- `activePlayer.fullRunes`: `{}`
-- active player's `runes`: `null`
-- no ordinary owned-augment ID array
+1. A provider emits three offer references or one picked reference.
+2. `parseAugmentProviderUpdate` normalizes the documented payload shape.
+3. `/api/lcu/provider-event` hands normalized events to `GameStateMonitor`.
+4. The monitor maps selections into current offers and owned augments, clears stale offers after a pick, and publishes an SSE snapshot.
+5. The picker and HUD resolve references through the local catalog.
+6. The resolver calculates current stat deltas and the item assistant queries champion-plus-augment participant cohorts.
 
-The Live Client payload can indirectly reveal some augments that grant a spell—for example `Augment_ClownCollege_Deceive`—but this is not a complete general augment feed.
+The same downstream path is used for Overwolf events, client-observed selections, screenshot detection, and manual confirmation. This keeps recommendation and math behavior consistent across distribution targets.
 
-Overwolf documents a separate Arena Game Events Provider feature named `picked_augment`. Apps running on Overwolf can therefore receive an event unavailable to this standalone Electron app. That is not evidence of a hidden raw-LCU endpoint and it means “competitors use OCR” is too broad a claim.
+## Conditional build data
 
-Source: https://dev.overwolf.com/ow-native/live-game-data-gep/supported-games/league-of-legends-arena/
+- Match-v5 is the post-game source for participant augment IDs and final items.
+- `participant_augments` is the indexed projection of immutable participant selections.
+- `/api/augment-builds?championId=<id>&augmentIds=<id,id>` intersects the requested augment set and aggregates items from only those matching champion games.
+- Fewer than 20 exact matches is labelled `Low sample`.
+- Empty exact cohorts use a champion-specific mechanical/extreme path or show that localized data is unavailable; they do not fall back to unrelated global items.
+- Match-v5 final inventory does not establish precise item purchase order. Round-level ordering requires a provider event or verified timeline field.
 
-## Arena Build Lab implementation
+## Execution plan
 
-- `npm run audit:lcu -- --duration=60 --interval=5` captures LCU gameflow plus Live Client `activeplayer`, `playerlist`, and `allgamedata` to the gitignored `logs/lcu_dump.json` file.
-- The audit recursively reports augment/perk/rune/cherry paths and runs the same owned-augment extractor used by the overlay.
-- Match-v5 remains the authoritative post-game source for participant augment IDs and final items.
-- `participant_augments` is a normalized, indexed projection of immutable `riot_participants.augments_json`.
-- `/api/augment-builds?championId=<id>&augmentIds=<id,id>` intersects every requested augment and aggregates items from exactly those matching participant games.
-- Fewer than 20 matching games is visibly labelled `Low sample`.
-- When the live APIs do not expose selected augments or the local cohort is empty, the overlay retains screenshot/manual capture and mechanical/extreme-build fallbacks.
+The single authoritative plan is [../ROADMAP.md](../ROADMAP.md). Immediate work is:
 
-## Remaining limitations
-
-Match-v5 records final inventory, not precise item purchase order. Round-specific recommendations require timeline-quality purchase events or another trustworthy round field. Conditional results are only as representative as the locally ingested cohort, so sample size and provenance must remain visible.
+1. activate the tested bridge inside an Overwolf Electron target;
+2. validate automatic Mayhem offer/pick flow end to end;
+3. collect sanitized Arena provider inventories;
+4. build the local visual provider for modes without structured selection events;
+5. compare resolver predictions with observed before/after live stats.
