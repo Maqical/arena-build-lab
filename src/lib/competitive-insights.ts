@@ -27,13 +27,17 @@ export function tierList(region: CompanionRegion, patch = ""): TierEntry[] {
   const selectedPatch = patch || String((db.prepare("SELECT patch FROM riot_matches WHERE (?='' OR platform=?) ORDER BY started_at DESC LIMIT 1").get(platform ?? "", platform ?? "") as Row | undefined)?.patch ?? "");
   if (!selectedPatch) return [];
   const rows = db.prepare(`
+    WITH filtered AS MATERIALIZED (
+      SELECT entity_key,metric,value,average_placement,sample_size
+      FROM meta_snapshots
+      WHERE source='riot_api_local' AND region=? AND patch=? AND kind='champion'
+    )
     SELECT c.id champion_id,c.name,c.icon_url,m.entity_key,
       MAX(CASE WHEN m.metric='win_rate' THEN m.value END) first_rate,
       MAX(CASE WHEN m.metric='top4_rate' THEN m.value END) top4_rate,
       MAX(CASE WHEN m.metric='pick_rate' THEN m.value END) pick_rate,
       MAX(m.average_placement) average_placement,MAX(m.sample_size) sample_size
-    FROM meta_snapshots m JOIN champions c ON m.entity_key='champion:'||c.champion_key
-    WHERE m.source='riot_api_local' AND m.region=? AND m.patch=? AND m.kind='champion'
+    FROM filtered m JOIN champions c ON m.entity_key='champion:'||c.champion_key
     GROUP BY c.id,c.name,c.icon_url,m.entity_key
   `).all(region, selectedPatch) as Row[];
   const ranked = rows.map((row) => {

@@ -862,3 +862,121 @@ footer { color: #5f5868; font-size: 10px; text-align: center; margin-top: 42px; 
 .meta-report-action { display: flex; gap: 7px; align-items: center; justify-content: flex-end; margin-top: 8px; }.meta-report-action button { padding: 8px 11px; border: 1px solid rgba(94,225,171,.25); border-radius: 7px; background: rgba(75,189,144,.09); color: #a9f3cf; cursor: pointer; }.meta-report-action small { color: #8194a2; }.performance-trend { margin-top: 16px; }.performance-trend > div { display: flex; height: 130px; gap: 8px; align-items: end; padding-top: 12px; }.performance-trend > div > span { display: grid; flex: 1; height: 100%; align-content: end; justify-items: center; }.performance-trend i { width: min(32px,80%); max-height: 100%; border-radius: 6px 6px 2px 2px; background: linear-gradient(#5de8a5,#40a9d0); }.performance-trend small { margin-top: 4px; color: #8ea0ae; font-size: 8px; }
 .patch-select { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 8px; color: #7f92a1; font-size: 10px; }.patch-select select { padding: 7px 9px; border: 1px solid var(--line); border-radius: 7px; background: #0a111a; color: #dce9f0; }
 @media (max-width: 820px) { .insight-page { padding: 24px 20px 48px; }.tier-row { grid-template-columns: 55px minmax(0,1fr); }.region-toggle { margin-top: 12px; } }
+
+/* Desktop readability pass. The frameless /overlay keeps its compact 450px
+   rules; these overrides only affect routes rendered inside DesktopShell. */
+.desktop-sidebar { width: auto; }
+.desktop-brand strong { font-size: 15px; }
+.desktop-brand strong small { font-size: 11px; }
+.desktop-sidebar nav a strong { font-size: 14px; }
+.desktop-client-status strong { font-size: 12px; }
+.desktop-client-status span { font-size: 11px; }
+
+.desktop-content :where(.eyebrow) { font-size: 12px; }
+.desktop-content :where(.collection-header p, .dashboard-hero p, .live-companion-page > header p, .insight-page .collection-header p) { font-size: 15px; }
+.desktop-content :where(.collection-header nav a, .build-lab-tabs button, .build-lab-tabs a, .region-toggle a) { min-height: 40px; font-size: 13px; }
+.desktop-content :where(.dashboard-status-grid span, .dashboard-status-grid small, .dashboard-actions p, .dashboard-actions output, .dashboard-match-list small, .dashboard-trophy-list small) { font-size: 12px; }
+.desktop-content :where(.dashboard-actions h2, .dashboard-match-list strong) { font-size: 15px; }
+
+.history-filterbar label { font-size: 12px; }
+.history-filterbar select, .history-filterbar .history-crazy { min-height: 42px; font-size: 14px; }
+.history-filterbar > strong { font-size: 14px; }
+.history-card { min-height: 92px; padding-block: 12px; }
+.history-placement span { font-size: 10px; }
+.history-shell .collection-header nav a { font-size: 13px; }
+.history-shell .history-placement span { font-size: 12px; }
+.history-title strong { font-size: 17px; }
+.history-title span { font-size: 12px; }
+.history-icon-row em { font-size: 12px; }
+.history-icon-row i, .history-icon-row span.uncatalogued > i { font-size: 12px; }
+.history-stats { font-size: 12px; }
+.history-stats b, .history-stats small { font-size: 12px; }
+.history-detail strong { font-size: 12px; }
+.history-detail p { font-size: 14px; }
+.history-detail small, .history-pagination span, .collection-empty p { font-size: 12px; }
+.history-pagination button { min-height: 40px; font-size: 13px; }
+
+.desktop-content :where(.tier-champion, .champion-picker a, .matchup-grid small, .pro-card header span, .pro-card header small, .pro-latest span, .trend-grid header span, .trend-bars small, .purchase-order small, .post-game-grade span, .pro-actions a, .stream-strip small, .performance-trend small, .patch-select) { font-size: 12px; }
+.desktop-content :where(.matchup-grid span, .meta-report-action small) { font-size: 13px; }
+.desktop-content .performance-trend small,
+.desktop-content .trend-bars small,
+.desktop-content .matchup-grid small { font-size: 12px; }
+
+.desktop-content .export-link,
+.desktop-content .tag-row > span,
+.desktop-content .mechanic-flow,
+.desktop-content .combo-entity,
+.desktop-content .evidence,
+.desktop-content .build-around { font-size: 12px; }
+.desktop-content :where(.lab-panel label, .metrics span, .anchor-note) { font-size: 12px; }
+.desktop-content .build-lab-page footer { font-size: 12px; line-height: 1.5; }
+
+.dashboard-status-grid span, .dashboard-status-grid small,
+.dashboard-actions p, .dashboard-actions output,
+.dashboard-match-list small, .dashboard-trophy-list small,
+.dashboard-panel > header a, .performance-trend small { font-size: 12px; }
+.dashboard-match-list b { font-size: 12px; }
+
+.trophy-shell .collection-header nav a { font-size: 13px; }
+.trophy-rank, .trophy-copy > span, .trophy-copy > b, .trophy-copy em { font-size: 12px; }
+.trophy-filters button { font-size: 13px; }
+
+.desktop-content .build-card-level,
+.desktop-content .build-card-augments em,
+.desktop-content .build-card-craze > div,
+.desktop-content .build-card-stats span,
+.desktop-content .build-card-items { font-size: 12px; }
+.desktop-content .build-card-stats strong { font-size: 15px; }
+.desktop-content .extreme-build-card .copy-build { min-height: 40px; font-size: 13px; }
+
+.settings-shell .collection-header nav a { font-size: 13px; }
+.settings-version { font-size: 12px; }
+
+.live-companion-page { width: min(1320px, 100%); padding: 38px clamp(24px, 4vw, 58px) 72px; }
+.live-companion-page .live-overlay { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.live-companion-page .live-overlay > * { grid-column: 1 / -1; }
+.live-companion-page .live-overlay > :where(.live-game-hud, .item-assistant) { grid-column: auto; margin: 0; padding: 22px; }
+.live-companion-page .live-overlay > :where(.overlay-status, .overlay-champion, .overlay-offers, .overlay-hud, .overlay-offer-wait, .overlay-idle-state, .overlay-connection-wait, .overlay-welcome) { padding: 18px 20px; }
+.live-companion-page .live-overlay :where(p, span, small, dt, dd, kbd, em) { font-size: 13px !important; line-height: 1.5; }
+.live-companion-page .overlay-status { min-height: 68px; }
+.live-companion-page .overlay-status strong { font-size: 17px; }
+.live-companion-page .overlay-status small { font-size: 13px; }
+.live-companion-page .overlay-status-actions b { font-size: 13px; }
+.live-companion-page .overlay-eye { width: 38px; height: 36px; font-size: 17px; }
+.live-companion-page .overlay-champion { grid-template-columns: 56px minmax(0, 1fr) auto; gap: 14px; }
+.live-companion-page .overlay-champion img, .live-companion-page .overlay-champion-placeholder { width: 56px; height: 56px; }
+.live-companion-page .overlay-champion span { font-size: 12px; }
+.live-companion-page .overlay-champion h1 { font-size: 28px; }
+.live-companion-page .overlay-champion > a strong { font-size: 18px; }
+.live-companion-page .overlay-champion > a span { max-width: 180px; font-size: 12px; }
+.live-companion-page .overlay-section-title, .live-companion-page .overlay-section-title b { margin-bottom: 12px; font-size: 13px; }
+.live-companion-page .live-game-identity strong { font-size: 22px; }
+.live-companion-page .live-game-identity span { font-size: 14px; }
+.live-companion-page .live-game-stats { gap: 10px; }
+.live-companion-page .live-game-stats > div { padding: 14px 8px; }
+.live-companion-page .live-game-stats span { font-size: 12px; }
+.live-companion-page .live-game-stats strong { font-size: 22px; }
+.live-companion-page .overlay-stat-grid strong { font-size: 22px; }
+.live-companion-page :where(.live-game-stats small, .live-craze small, .overlay-muted) { font-size: 13px; line-height: 1.5; }
+.live-companion-page .live-craze span { font-size: 14px; }
+.live-companion-page .live-craze strong { font-size: 25px; }
+.live-companion-page :where(.live-augment-list span, .live-item-list span, .item-buy-list strong) { font-size: 17px; }
+.live-companion-page .item-buy-list small { font-size: 13px; line-height: 1.5; }
+.live-companion-page .item-buy-list em { font-size: 12px; }
+.live-companion-page .purchase-order small { font-size: 12px; }
+.live-companion-page .screenshot-picker-control button, .live-companion-page .overlay-manual-selection summary, .live-companion-page .overlay-manual-selection select, .live-companion-page .overlay-manual-selection button { min-height: 42px; font-size: 14px; }
+.live-companion-page .screenshot-picker-control p { font-size: 14px; line-height: 1.5; }
+.live-companion-page .overlay-offer-wait span, .live-companion-page .overlay-idle-state strong { font-size: 17px; }
+.live-companion-page .overlay-offer-wait p, .live-companion-page .overlay-idle-state p { font-size: 14px; line-height: 1.5; }
+.live-companion-page .live-overlay > footer { margin-top: 0; font-size: 12px; }
+
+.route-loading { display: grid; min-height: 100%; place-content: center; justify-items: center; gap: 8px; padding: 40px; color: #dce9f0; text-align: center; }
+.route-loading > span { width: 34px; height: 34px; border: 3px solid rgba(101,220,245,.18); border-top-color: #65dcf5; border-radius: 50%; animation: route-loading-spin .75s linear infinite; }
+.route-loading strong { margin-top: 6px; font-size: 18px; }
+.route-loading p { margin: 0; color: #8fa2b1; font-size: 14px; }
+@keyframes route-loading-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 1100px) {
+  .live-companion-page .live-overlay { grid-template-columns: 1fr; }
+  .live-companion-page .live-overlay > :where(.live-game-hud, .item-assistant) { grid-column: 1; }
+}

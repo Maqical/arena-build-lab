@@ -1,6 +1,6 @@
 {
   "name": "arena-build-lab",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "main": "electron/main.cjs",
   "description": "Local-first League of Legends Arena and ARAM: Mayhem companion overlay",
@@ -19,6 +19,7 @@
     "test": "tsx --test tests/*.test.ts",
     "test:ui": "node scripts/verify-ui.mjs",
     "test:competitive-ui": "tsx tests/competitive-ui.spec.ts",
+    "test:readability": "tsx tests/ui-readability.spec.ts",
     "test:uncatalogued": "tsx tests/uncatalogued.spec.ts",
     "stress:crawl": "tsx scripts/stress_test_crawler.ts",
     "stress:resolver": "tsx scripts/stress_test_resolver.ts",

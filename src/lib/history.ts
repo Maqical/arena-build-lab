@@ -1,7 +1,8 @@
 import "server-only";
 
 import { getDatabase, jsonArray } from "@/lib/db";
-import { resolveSelectionOptions } from "@/lib/queries";
+import { displayPatchVersion } from "@/lib/patch-version";
+import { normalizedSelectionKey, selectionNumericId, uncataloguedSelectionLabel } from "@/lib/selection-label";
 
 type Row = Record<string, unknown>;
 
@@ -38,42 +39,49 @@ function selectedPuuid(): string {
   return String(row?.puuid ?? "");
 }
 
-function mapAugments(ids: string[]): MatchHistoryEntry["augments"] {
-  return resolveSelectionOptions(ids).map((selection) => ({
-    key: selection.entityKey,
-    numericId: selection.numericId,
-    name: selection.name,
-    iconUrl: selection.iconUrl,
-    rarity: selection.rarity,
-    catalogued: selection.catalogued,
-  }));
-}
+type CatalogLookup = {
+  augments: Map<string, MatchHistoryEntry["augments"][number]>;
+  items: Map<string, MatchHistoryEntry["items"][number]>;
+};
 
-function mapItems(db: ReturnType<typeof getDatabase>, ids: string[]): MatchHistoryEntry["items"] {
-  const select = db.prepare("SELECT entity_key, name, icon_url FROM entities WHERE entity_key = ? AND kind = 'item'");
-  return ids.flatMap((id) => {
-    const key = /^item:/.test(id) ? id : `item:${id}`;
-    const row = select.get(key) as Row | undefined;
-    return row ? [{ key: String(row.entity_key), name: String(row.name), iconUrl: String(row.icon_url ?? "") }] : [];
-  });
+function catalogLookup(db: ReturnType<typeof getDatabase>): CatalogLookup {
+  const rows = db.prepare(`
+    SELECT entity_key, numeric_id, name, kind, icon_url, rarity
+    FROM entities WHERE kind IN ('augment', 'item')
+  `).all() as Row[];
+  const augments = new Map<string, MatchHistoryEntry["augments"][number]>();
+  const items = new Map<string, MatchHistoryEntry["items"][number]>();
+  for (const row of rows) {
+    const key = String(row.entity_key);
+    if (row.kind === "augment") {
+      augments.set(key, {
+        key,
+        numericId: Number(row.numeric_id),
+        name: String(row.name),
+        iconUrl: String(row.icon_url ?? ""),
+        rarity: String(row.rarity ?? ""),
+        catalogued: true,
+      });
+    } else {
+      items.set(key, { key, name: String(row.name), iconUrl: String(row.icon_url ?? "") });
+    }
+  }
+  return { augments, items };
 }
 
 export function getMatchHistory(limit = 100, includeAllPlayers = false): MatchHistoryEntry[] {
   const db = getDatabase();
   const puuid = selectedPuuid();
+  const catalog = catalogLookup(db);
   const rows = db.prepare(`
     SELECT rp.match_id, rm.started_at, rm.patch, rm.routing_region, rm.platform,
       rp.champion_id, rp.champion_name, rp.placement, rp.augments_json, rp.items_json, rp.final_stats_json,
       rm.duration_seconds,
-      c.icon_url AS champion_icon_url,
-      MAX(lo.observed_max_hp) AS observed_max_hp,
-      MAX(lo.observed_max_ad) AS observed_max_ad
+      c.icon_url AS champion_icon_url
     FROM riot_participants rp
     JOIN riot_matches rm ON rm.match_id = rp.match_id
     LEFT JOIN champions c ON c.id = rp.champion_id
-    LEFT JOIN live_observations lo ON lo.champion_id = rp.champion_id
-    WHERE (? = 1 OR ? = '' OR rp.puuid = ?)
-    GROUP BY rp.match_id, rp.participant_index
+    WHERE (? = 1 OR (? <> '' AND rp.puuid = ?))
     ORDER BY rm.started_at DESC
     LIMIT ?
   `).all(includeAllPlayers ? 1 : 0, puuid, puuid, Math.min(Math.max(limit, 1), 1_000)) as Row[];
@@ -83,12 +91,30 @@ export function getMatchHistory(limit = 100, includeAllPlayers = false): MatchHi
     let finalStats: Record<string, unknown> = {};
     try { finalStats = JSON.parse(String(row.final_stats_json ?? "{}")) as Record<string, unknown>; } catch { /* Keep partial records readable. */ }
     const finite = (key: string) => Number.isFinite(Number(finalStats[key])) ? Number(finalStats[key]) : null;
-    const maxHp = row.observed_max_hp == null ? null : Number(row.observed_max_hp);
-    const maxAd = row.observed_max_ad == null ? null : Number(row.observed_max_ad);
+    // Live observations are session records and do not currently carry a match ID.
+    // Joining them by champion falsely assigns one session's peak to every match.
+    const maxHp = null;
+    const maxAd = null;
+    const augments = augmentKeys.map((reference) => {
+      const key = normalizedSelectionKey(reference);
+      return catalog.augments.get(key) ?? {
+        key,
+        numericId: selectionNumericId(reference),
+        name: uncataloguedSelectionLabel(reference),
+        iconUrl: "",
+        rarity: "uncatalogued",
+        catalogued: false,
+      };
+    });
+    const items = itemKeys.flatMap((reference) => {
+      const key = /^item:/i.test(reference) ? reference : `item:${reference}`;
+      const item = catalog.items.get(key);
+      return item ? [item] : [];
+    });
     return {
       matchId: String(row.match_id),
       startedAt: String(row.started_at),
-      patch: String(row.patch),
+      patch: displayPatchVersion(String(row.patch)),
       region: String(row.routing_region),
       platform: String(row.platform),
       championId: Number(row.champion_id),
@@ -96,8 +122,8 @@ export function getMatchHistory(limit = 100, includeAllPlayers = false): MatchHi
       championIconUrl: String(row.champion_icon_url ?? ""),
       placement: row.placement == null ? null : Number(row.placement),
       augmentKeys,
-      augments: mapAugments(augmentKeys),
-      items: mapItems(db, itemKeys),
+      augments,
+      items,
       kills: finite("kills"),
       deaths: finite("deaths"),
       assists: finite("assists"),
@@ -124,6 +150,7 @@ export type Trophy = {
 
 export function getTrophies(limit = 10): Trophy[] {
   const db = getDatabase();
+  const catalog = catalogLookup(db);
   const rows = db.prepare(`
     SELECT lo.id, lo.champion_id, lo.champion_name, lo.augment_ids_json,
       lo.observed_max_hp, lo.observed_max_ad, lo.observed_max_ap, lo.observed_max_as,
@@ -143,7 +170,19 @@ export function getTrophies(limit = 10): Trophy[] {
     return [{
       id: Number(row.id), championId: row.champion_id == null ? null : Number(row.champion_id),
       championName: String(row.champion_name || "Unknown champion"), championIconUrl: String(row.champion_icon_url ?? ""),
-      augmentKeys, augments: mapAugments(augmentKeys), stat, value, endedAt: String(row.ended_at),
+      augmentKeys,
+      augments: augmentKeys.map((reference) => {
+        const key = normalizedSelectionKey(reference);
+        return catalog.augments.get(key) ?? {
+          key,
+          numericId: selectionNumericId(reference),
+          name: uncataloguedSelectionLabel(reference),
+          iconUrl: "",
+          rarity: "uncatalogued",
+          catalogued: false,
+        };
+      }),
+      stat, value, endedAt: String(row.ended_at),
     }];
   });
 }

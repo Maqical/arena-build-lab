@@ -55,7 +55,7 @@ export function DesktopShell({ children }: { children: React.ReactNode }) {
         <nav>
           {NAVIGATION.map((item) => {
             const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(`${item.href}/`));
-            return <Link key={item.href} href={item.href} className={active ? "active" : ""} title={item.label} aria-current={active ? "page" : undefined}>
+            return <Link key={item.href} href={item.href} prefetch={false} className={active ? "active" : ""} title={item.label} aria-current={active ? "page" : undefined}>
               <span aria-hidden="true">{item.icon}</span><strong>{item.label}</strong>
             </Link>;
           })}
