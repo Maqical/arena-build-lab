@@ -275,7 +275,8 @@ export function companionMode(details: { isArena: boolean; queueId: number | nul
   return null;
 }
 
-function normalizedPhase(rawPhase: string, supportsAugments: boolean, offers: readonly string[], liveAvailable: boolean): ArenaGamePhase {
+function normalizedPhase(rawPhase: string, supportsAugments: boolean, offers: readonly string[], liveAvailable: boolean, preferOffers = false): ArenaGamePhase {
+  if (preferOffers && offers.length === 3) return "augment_select";
   if (liveAvailable || rawPhase === "InProgress") return "in_progress";
   if (offers.length === 3) return "augment_select";
   if (rawPhase === "ChampSelect" && supportsAugments) return "champ_select";
@@ -360,6 +361,15 @@ export class GameStateMonitor extends EventEmitter {
     const normalized = normalizedAugmentRef(reference);
     if (!normalized || !this.snapshotValue.supportsAugments || !["augment_select", "in_progress"].includes(this.snapshotValue.phase)) return false;
     this.selectedAugments.add(normalized);
+    this.offers = null;
+    void this.refresh();
+    return true;
+  }
+
+  ingestProviderOffers(references: string[], source = "provider://augments"): boolean {
+    const normalized = unique(references.map(normalizedAugmentRef));
+    if (normalized.length !== 3 || !this.snapshotValue.supportsAugments) return false;
+    this.offers = { refs: normalized, sourceUri: source, detectedAt: new Date().toISOString(), expiresAt: Date.now() + 45_000 };
     void this.refresh();
     return true;
   }
@@ -434,7 +444,7 @@ export class GameStateMonitor extends EventEmitter {
       const currentEntityRefs = live ? unique([...extractTrackableItemRefs(live), ...this.selectedAugments]) : [...this.selectedAugments];
       if (this.offers && this.offers.refs.some((offer) => currentEntityRefs.includes(offer))) this.offers = null;
       const offeredAugmentRefs = this.offers?.refs ?? [];
-      const phase = normalizedPhase(rawPhase, supportsAugments, offeredAugmentRefs, Boolean(live));
+      const phase = normalizedPhase(rawPhase, supportsAugments, offeredAugmentRefs, Boolean(live), Boolean(this.offers?.sourceUri.startsWith("overwolf://")));
       const members = await this.enrichLobbyMembers(lobbyMembers(lobby, champSelect), connection.connected);
       const championId = livePlayer.name ? null : championFromSelect(champSelect);
       const offerStatus = offeredAugmentRefs.length === 3 ? "detected" : supportsAugments && phase === "in_progress" ? "not_exposed" : "waiting";

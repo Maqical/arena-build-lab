@@ -2,6 +2,7 @@ import "server-only";
 
 import { getDatabase, jsonArray } from "@/lib/db";
 import { normalizedSelectionKey, selectionNumericId, uncataloguedSelectionLabel } from "@/lib/selection-label";
+import { displayPatchVersion } from "@/lib/patch-version";
 import type { CatalogEntity, Champion, Combo, EntityKind, EntityOption, StatFormula, StatKey, Video } from "@/lib/types";
 
 type EntityRow = Record<string, unknown>;
@@ -52,7 +53,8 @@ export function getOverview() {
   const metadata = Object.fromEntries(
     (db.prepare("SELECT key, value FROM metadata").all() as Array<{ key: string; value: string }>).map((row) => [row.key, row.value]),
   );
-  return { ...counts, patch: metadata.patch ?? "not synced", lastSync: metadata.last_static_sync ?? "" };
+  const dataPatch = metadata.patch ?? "not synced";
+  return { ...counts, patch: displayPatchVersion(dataPatch), dataPatch, lastSync: metadata.last_static_sync ?? "" };
 }
 
 export function getChampions(): Champion[] {

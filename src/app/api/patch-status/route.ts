@@ -1,4 +1,5 @@
 import { getDatabase } from "@/lib/db";
+import { displayPatchVersion } from "@/lib/patch-version";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,8 +12,8 @@ export async function GET() {
     const versions = await response.json() as unknown;
     const livePatch = Array.isArray(versions) ? String(versions[0] ?? "") : "";
     if (!/^\d+\.\d+(?:\.\d+)?$/.test(livePatch)) throw new Error("Data Dragon returned an invalid patch list.");
-    return Response.json({ localPatch, livePatch, stale: localPatch !== livePatch, checkedAt: new Date().toISOString() }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ localPatch, livePatch, localDisplayPatch: displayPatchVersion(localPatch), liveDisplayPatch: displayPatchVersion(livePatch), stale: localPatch !== livePatch, checkedAt: new Date().toISOString() }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    return Response.json({ localPatch, livePatch: "", stale: false, checkedAt: new Date().toISOString(), error: error instanceof Error ? error.message : "Patch check failed." }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ localPatch, livePatch: "", localDisplayPatch: displayPatchVersion(localPatch), liveDisplayPatch: "", stale: false, checkedAt: new Date().toISOString(), error: error instanceof Error ? error.message : "Patch check failed." }, { headers: { "Cache-Control": "no-store" } });
   }
 }

@@ -177,6 +177,24 @@ function waitForServer() {
   });
 }
 
+function forwardProviderEvent(payload) {
+  const body = Buffer.from(JSON.stringify(payload));
+  const request = http.request({ hostname: "127.0.0.1", port: PORT, path: "/api/lcu/provider-event", method: "POST", headers: { "Content-Type": "application/json", "Content-Length": body.length }, timeout: 2_000 });
+  request.on("error", () => {});
+  request.on("timeout", () => request.destroy());
+  request.end(body);
+}
+
+function startOverwolfAugmentProvider() {
+  const gep = app.overwolf?.packages?.gep;
+  if (!gep) return false;
+  gep.on("game-detected", (event) => event.enable());
+  gep.setRequiredFeatures(["augments", "live_client_data", "match_info"]);
+  gep.on("new-info-update", (_event, _gameId, ...updates) => forwardProviderEvent(updates));
+  gep.on("new-game-event", (_event, _gameId, ...events) => forwardProviderEvent(events));
+  return true;
+}
+
 async function capturePicker() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
@@ -320,6 +338,7 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
   createWindow();
   createDashboardWindow();
   createTray();
+  startOverwolfAugmentProvider();
   globalShortcut.register("CommandOrControl+Shift+A", () => void capturePicker());
   app.setLoginItemSettings({ openAtLogin: saved.openAtLogin });
 });

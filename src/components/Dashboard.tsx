@@ -6,7 +6,7 @@ import { useState } from "react";
 import type { MatchHistoryEntry, Trophy } from "@/lib/history";
 
 type DashboardData = {
-  overview: { patch: string; champions: number; augments: number; items: number; videos: number; curatedCombos: number; discoveredCombos: number };
+  overview: { patch: string; dataPatch?: string; champions: number; augments: number; items: number; videos: number; curatedCombos: number; discoveredCombos: number };
   matches: MatchHistoryEntry[];
   trophies: Trophy[];
   warehouse: { matches: number; participants: number; observations: number; snapshots: number };
@@ -29,7 +29,7 @@ export function Dashboard({ data }: { data: DashboardData }) {
   return <main className="dashboard-page">
     <header className="dashboard-hero"><div><span className="eyebrow">Local Arena companion</span><h1>Your command center</h1><p>Live game context, build research, personal history, and theoretical extremes—without leaving the desktop app.</p></div><button type="button" onClick={() => void window.arenaDesktop?.openOverlay()}>Open live overlay</button></header>
     <section className="dashboard-status-grid" aria-label="Data status">
-      <article><span>Current patch</span><strong>{data.overview.patch}</strong><small>{data.overview.champions} champions indexed</small></article>
+      <article><span>Current patch</span><strong>{data.overview.patch}</strong><small>{data.overview.champions} champions indexed{data.overview.dataPatch && data.overview.dataPatch !== data.overview.patch ? ` · Data build ${data.overview.dataPatch}` : ""}</small></article>
       <article><span>Local matches</span><strong>{data.warehouse.matches.toLocaleString()}</strong><small>{data.warehouse.participants.toLocaleString()} participant records</small></article>
       <article><span>Meta samples</span><strong>{data.warehouse.snapshots.toLocaleString()}</strong><small>provenance-first snapshots</small></article>
       <article><span>Catalog</span><strong>{(data.overview.augments + data.overview.items).toLocaleString()}</strong><small>{data.overview.augments} augments · {data.overview.items} items</small></article>
