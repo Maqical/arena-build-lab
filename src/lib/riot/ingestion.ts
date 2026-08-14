@@ -4,6 +4,44 @@ import { RiotApiClient, type RiotPlatform, type RiotRoutingRegion } from "./riot
 
 type Row = Record<string, unknown>;
 
+type ItemTimelineEvent = { participantIndex: number; itemId: number; timestampMs: number; eventType: string };
+
+function record(value: unknown): Row | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Row : null;
+}
+
+export function parseItemTimeline(value: unknown): ItemTimelineEvent[] {
+  const info = record(record(value)?.info);
+  const frames = Array.isArray(info?.frames) ? info.frames : [];
+  const output: ItemTimelineEvent[] = [];
+  for (const frameValue of frames) {
+    const frame = record(frameValue);
+    for (const eventValue of Array.isArray(frame?.events) ? frame.events : []) {
+      const event = record(eventValue);
+      const eventType = String(event?.type ?? "");
+      const participantIndex = Number(event?.participantId ?? 0);
+      const itemId = Number(event?.itemId ?? event?.beforeId ?? 0);
+      const timestampMs = Number(event?.timestamp ?? frame?.timestamp ?? 0);
+      if (["ITEM_PURCHASED", "ITEM_SOLD", "ITEM_UNDO"].includes(eventType) && Number.isInteger(participantIndex) && participantIndex > 0 && Number.isInteger(itemId) && itemId > 0) {
+        output.push({ participantIndex, itemId, timestampMs: Number.isFinite(timestampMs) ? Math.max(0, Math.trunc(timestampMs)) : 0, eventType });
+      }
+    }
+  }
+  return output;
+}
+
+export function insertItemTimeline(db: DatabaseSync, matchId: string, value: unknown): number {
+  const insert = db.prepare("INSERT OR IGNORE INTO participant_item_events(match_id,participant_index,sequence_index,item_id,timestamp_ms,event_type) VALUES (?,?,?,?,?,?)");
+  let inserted = 0;
+  const sequenceByParticipant = new Map<number, number>();
+  for (const event of parseItemTimeline(value)) {
+    const sequence = sequenceByParticipant.get(event.participantIndex) ?? 0;
+    sequenceByParticipant.set(event.participantIndex, sequence + 1);
+    inserted += Number(insert.run(matchId, event.participantIndex, sequence, event.itemId, event.timestampMs, event.eventType).changes);
+  }
+  return inserted;
+}
+
 export type CohortMember = {
   cohortId: string;
   puuid: string;
@@ -221,7 +259,7 @@ export async function ingestCohortMember(
   db: DatabaseSync,
   client: RiotApiClient,
   member: CohortMember,
-  options: { count?: number; onMatchPayload?: (match: unknown) => Promise<void> | void } = {},
+  options: { count?: number; includeTimeline?: boolean; onMatchPayload?: (match: unknown) => Promise<void> | void } = {},
 ): Promise<IngestionSummary> {
   const targetCount = Math.min(Math.max(Math.trunc(options.count ?? 20), 1), 100);
   const startTimeSeconds = member.lastMatchStartMs
@@ -264,6 +302,10 @@ export async function ingestCohortMember(
     if (insertParsedMatch(db, parsed)) {
       insertedMatches += 1;
       insertedParticipants += parsed.participantCount;
+      if (options.includeTimeline) {
+        try { insertItemTimeline(db, matchId, await client.timeline(member.routingRegion, matchId)); }
+        catch { /* Match data remains useful when a timeline is temporarily unavailable. */ }
+      }
     }
     newestMatchStartMs = Math.max(newestMatchStartMs ?? 0, parsed.startedAtMs);
   }

@@ -13,9 +13,11 @@ type ConditionalResponse = {
   message: string;
   items: Array<{ entityKey: string; name: string; iconUrl: string; games: number; pickRate: number; reason: string }>;
 };
+type BuildPath = { items: Array<{ id: number; name: string; iconUrl: string }>; games: number; share: number };
 
 export function ItemAssistant({ championId, augments }: { championId: number | null; augments: OverlayCatalogEntity[] }) {
   const [conditional, setConditional] = useState<ConditionalResponse | null>(null);
+  const [paths, setPaths] = useState<BuildPath[]>([]);
 
   useEffect(() => {
     const augmentIds = augments.map((augment) => augment.numericId).filter((id) => id > 0);
@@ -28,16 +30,25 @@ export function ItemAssistant({ championId, augments }: { championId: number | n
     return () => controller.abort();
   }, [augments, championId]);
 
+  useEffect(() => {
+    const augmentIds = augments.map((augment) => augment.numericId).filter((id) => id > 0);
+    if (!championId) return;
+    const controller = new AbortController();
+    void fetch(`/api/insights?kind=paths&region=global&championId=${championId}&augmentIds=${augmentIds.join(",")}`, { signal: controller.signal, cache: "no-store" })
+      .then((response) => response.ok ? response.json() as Promise<{ rows: BuildPath[] }> : Promise.reject(new Error("purchase paths unavailable")))
+      .then((payload) => setPaths(payload.rows))
+      .catch((error: unknown) => { if (!(error instanceof DOMException && error.name === "AbortError")) setPaths([]); });
+    return () => controller.abort();
+  }, [augments, championId]);
+
   const selectedAugmentIds = augments.map((augment) => augment.numericId).filter((id) => id > 0).sort((left, right) => left - right);
   const responseAugmentIds = [...(conditional?.augmentIds ?? [])].sort((left, right) => left - right);
   const active = championId && selectedAugmentIds.length > 0 && selectedAugmentIds.join(",") === responseAugmentIds.join(",") ? conditional : null;
   return <section className="item-assistant">
-    <div className="overlay-section-title">
-      <span>{active?.augmentNames.length ? `Buys with ${active.augmentNames.join(" + ")}` : "Champion-specific buys"}</span>
-      <b>{active?.source === "observed" ? `${active.sampleSize} games` : active?.source === "extreme" ? "Mechanical" : "Localized only"}</b>
-    </div>
+    <div className="overlay-section-title"><span>{active?.augmentNames.length ? `Buys with ${active.augmentNames.join(" + ")}` : "Champion-specific buys"}</span><b>{active?.source === "observed" ? `${active.sampleSize} games` : active?.source === "extreme" ? "Mechanical" : "Localized only"}</b></div>
     {(active?.items.length ?? 0) > 0
       ? <div className="item-buy-list">{active?.items.map((item) => <div key={item.entityKey}>{item.iconUrl ? <Image src={item.iconUrl} width={34} height={34} alt="" unoptimized /> : null}<span><strong>{item.name}</strong><small>{active.source === "observed" ? `${(item.pickRate * 100).toFixed(0)}% pick · ${item.games} matching games` : item.reason}</small></span><em>{active.source === "observed" ? "Observed" : "Extreme"}</em></div>)}</div>
-      : <p className="overlay-muted">{active?.message ?? (augments.length === 0 ? "Scan or select an augment for champion-specific recommendations." : "Checking localized item paths…")}</p>}
+      : <p className="overlay-muted">{active?.message ?? (augments.length === 0 ? "Scan or select an augment for champion-specific recommendations." : "Checking localized item paths...")}</p>}
+    {championId && paths[0] && <div className="purchase-order"><div className="overlay-section-title"><span>Observed purchase order</span><b>{paths[0].games} games</b></div><div>{paths[0].items.map((item, index) => <span key={`${item.id}-${index}`}>{item.iconUrl ? <Image src={item.iconUrl} width={28} height={28} alt="" unoptimized /> : null}<small>{index + 1}. {item.name}</small></span>)}</div></div>}
   </section>;
 }

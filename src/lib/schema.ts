@@ -271,6 +271,59 @@ CREATE TABLE IF NOT EXISTS cohort_members (
 CREATE INDEX IF NOT EXISTS cohort_members_active_idx
 ON cohort_members(cohort_id, active, platform);
 
+CREATE TABLE IF NOT EXISTS pro_players (
+  puuid TEXT PRIMARY KEY,
+  game_name TEXT NOT NULL,
+  tag_line TEXT NOT NULL,
+  display_name TEXT NOT NULL,
+  team TEXT NOT NULL DEFAULT '',
+  role TEXT NOT NULL DEFAULT '',
+  region TEXT NOT NULL,
+  platform TEXT NOT NULL,
+  source_url TEXT NOT NULL DEFAULT '',
+  active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+  last_synced_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS pro_players_region_idx
+ON pro_players(region, team, display_name);
+
+CREATE TABLE IF NOT EXISTS followed_players (
+  puuid TEXT PRIMARY KEY REFERENCES pro_players(puuid) ON DELETE CASCADE,
+  notify_new_match INTEGER NOT NULL DEFAULT 1 CHECK (notify_new_match IN (0, 1)),
+  followed_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS participant_item_events (
+  match_id TEXT NOT NULL,
+  participant_index INTEGER NOT NULL,
+  sequence_index INTEGER NOT NULL,
+  item_id INTEGER NOT NULL,
+  timestamp_ms INTEGER NOT NULL,
+  event_type TEXT NOT NULL,
+  PRIMARY KEY(match_id, participant_index, sequence_index),
+  FOREIGN KEY(match_id, participant_index)
+    REFERENCES riot_participants(match_id, participant_index) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS participant_item_events_path_idx
+ON participant_item_events(match_id, participant_index, timestamp_ms, sequence_index);
+
+CREATE TABLE IF NOT EXISTS notification_outbox (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  kind TEXT NOT NULL,
+  dedupe_key TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  delivered_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS notification_outbox_pending_idx
+ON notification_outbox(delivered_at, created_at);
+
 CREATE TABLE IF NOT EXISTS meta_snapshots (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   source TEXT NOT NULL,

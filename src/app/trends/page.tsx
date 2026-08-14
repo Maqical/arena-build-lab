@@ -1,0 +1,6 @@
+import { MetaReportButton } from "@/components/MetaReportButton";
+import { RegionToggle } from "@/components/RegionToggle";
+import { entityTrend,tierList } from "@/lib/competitive-insights";
+import { selectedRegion } from "@/lib/region";
+export const dynamic="force-dynamic";
+export default async function TrendsPage({searchParams}:{searchParams:Promise<{region?:string}>}){const query=await searchParams,region=selectedRegion(query.region),leaders=tierList(region).slice(0,12);return <main className="insight-page"><header className="collection-header"><div><span className="eyebrow">Patch-over-patch warehouse</span><h1>Meta Trends</h1><p>First-place movement with sample sizes retained for every point.</p></div><div><RegionToggle region={region} pathname="/trends"/><MetaReportButton region={region}/></div></header><section className="trend-grid">{leaders.map((leader)=>{const points=entityTrend(leader.entityKey,"win_rate",region);return <article key={leader.championId}><header><strong>{leader.name}</strong><span>{leader.tier} tier</span></header><div className="trend-bars">{points.map((point)=><div key={point.patch} title={`${(point.value*100).toFixed(1)}% · ${point.sampleSize} games`}><i style={{height:`${Math.max(4,point.value*300)}px`}}/><small>{point.patch}</small></div>)}</div></article>;})}</section></main>;}

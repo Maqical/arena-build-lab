@@ -26,10 +26,20 @@ export type DuoRecommendation = {
   gamesTogether?: number;
 };
 
+export type MatchupRecommendation = {
+  championId: number;
+  name: string;
+  iconUrl: string;
+  games: number;
+  aheadRate: number;
+};
+
 export type ChampSelectRecommendation = {
   champion: { id: number; key: string; name: string; iconUrl: string; tags: string[] };
   meta: { tier: string; winRate: number | null; pickRate: number | null; patch: string } | null;
   duoRecommendations: DuoRecommendation[];
+  favorableMatchups: MatchupRecommendation[];
+  difficultMatchups: MatchupRecommendation[];
   recommendedAugments: ChampSelectEntityRecommendation[];
   recommendedItems: ChampSelectEntityRecommendation[];
   extremeBuilds: ExtremeBuildCsvRow[];

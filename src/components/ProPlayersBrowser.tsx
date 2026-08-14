@@ -1,0 +1,13 @@
+"use client";
+import { useEffect, useState } from "react";
+import type { ProPlayerCard } from "@/lib/pro-players";
+import type { LiveStream } from "@/lib/twitch";
+
+export function ProPlayersBrowser({ initial }: { initial:ProPlayerCard[] }) {
+  const [players,setPlayers]=useState(initial),[message,setMessage]=useState("");
+  const [streams,setStreams]=useState<LiveStream[]>([]);
+  useEffect(()=>{const controller=new AbortController();void fetch("/api/streams",{signal:controller.signal,cache:"no-store"}).then((response)=>response.json()).then((payload:{streams?:LiveStream[]})=>setStreams(payload.streams??[])).catch(()=>undefined);return()=>controller.abort();},[]);
+  async function follow(puuid:string,next:boolean){const response=await fetch("/api/pros",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({puuid,follow:next})});if(response.ok)setPlayers((current)=>current.map((player)=>player.puuid===puuid?{...player,followed:next}:player));else setMessage("Could not update this follow locally.");}
+  async function copy(player:ProPlayerCard){const match=player.recent[0];if(!match)return;await navigator.clipboard.writeText(`${player.displayName} · ${match.championName}\nAugments: ${match.augments.join(", ")}\nItems: ${match.items.join(", ")}`);setMessage(`${player.displayName}'s latest setup copied.`);}
+  return <>{message&&<output className="insight-message">{message}</output>}{streams.length>0&&<section className="stream-strip"><strong>Live now</strong>{streams.map((stream)=><a href={stream.url} target="_blank" rel="noreferrer" key={stream.login}><span>{stream.displayName}</span><small>{stream.viewerCount.toLocaleString()} viewers · {stream.title}</small></a>)}</section>}<section className="pro-grid">{players.map((player)=><article className="pro-card" key={player.puuid}><header><div><span>{player.team||player.region.toUpperCase()} · {player.role||"Player"}</span><strong>{player.displayName}</strong><small>{player.riotId}</small></div><button type="button" onClick={()=>void follow(player.puuid,!player.followed)}>{player.followed?"Following":"Follow"}</button></header>{player.recent[0]?<div className="pro-latest"><b>{player.recent[0].championName} · #{player.recent[0].placement??"—"}</b><span>{player.recent[0].augments.join(" · ")||"No augment IDs"}</span><span>{player.recent[0].items.join(" → ")||"No final items"}</span><div className="pro-actions"><button type="button" onClick={()=>void copy(player)}>Copy latest setup</button>{player.sourceUrl&&<a href={player.sourceUrl} target="_blank" rel="noreferrer">Profile / replays</a>}</div></div>:<p>No Arena matches synced for this player yet.</p>}</article>)}</section></>;
+}

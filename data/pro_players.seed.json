@@ -1,0 +1,7 @@
+[
+  { "riotId": "DK ShowMaker#KR1", "displayName": "ShowMaker", "team": "DK", "role": "Mid", "region": "kr", "platform": "kr", "sourceUrl": "https://op.gg/lol/leaderboards/tier?region=kr" },
+  { "riotId": "HLE Gumayusi#0298", "displayName": "Gumayusi", "team": "HLE", "role": "Bot", "region": "kr", "platform": "kr", "sourceUrl": "https://op.gg/lol/leaderboards/tier?region=kr" },
+  { "riotId": "BLG Viper#0708", "displayName": "Viper", "team": "BLG", "role": "Bot", "region": "kr", "platform": "kr", "sourceUrl": "https://op.gg/lol/leaderboards/tier?region=kr" },
+  { "riotId": "T1 Ella#1995", "displayName": "Ella", "team": "T1", "role": "", "region": "kr", "platform": "kr", "sourceUrl": "https://op.gg/lol/summoners/kr/T1%20Ella-1995" },
+  { "riotId": "winter#KR T1", "displayName": "winter", "team": "T1", "role": "", "region": "kr", "platform": "kr", "sourceUrl": "https://op.gg/lol/summoners/kr/winter-KR%20T1" }
+]

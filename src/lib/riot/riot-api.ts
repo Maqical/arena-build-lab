@@ -170,6 +170,10 @@ export class RiotApiClient {
     return this.requestJson(region, `/lol/match/v5/matches/${encodeURIComponent(matchId)}`);
   }
 
+  timeline(region: RiotRoutingRegion, matchId: string): Promise<unknown> {
+    return this.requestJson(region, `/lol/match/v5/matches/${encodeURIComponent(matchId)}/timeline`);
+  }
+
   challengerLeague(platform: RiotPlatform): Promise<ChallengerLeague> {
     return this.requestJson(platform, "/lol/league/v4/challengerleagues/by-queue/RANKED_SOLO_5x5");
   }

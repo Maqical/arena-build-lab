@@ -7,7 +7,7 @@ import { DatabaseSync } from "node:sqlite";
 import { parseRiotMatch } from "../src/lib/riot/arena-match";
 import { insertLiveObservation, mergeObservedMaxima } from "../src/lib/live-observations";
 import { calculateMeta } from "../src/lib/meta-aggregation";
-import { cohortMembers, ingestCohortMember, insertParsedMatch, upsertCohortMember } from "../src/lib/riot/ingestion";
+import { cohortMembers, ingestCohortMember, insertItemTimeline, insertParsedMatch, parseItemTimeline, upsertCohortMember } from "../src/lib/riot/ingestion";
 import { parseRiotId, platformFromTagLine, RiotApiClient } from "../src/lib/riot/riot-api";
 import { RiotRequestQueue } from "../src/lib/riot/request-queue";
 import { SCHEMA_SQL } from "../src/lib/schema";
@@ -102,6 +102,20 @@ test("checkpointed ingestion can rerun the same Riot history without duplicates"
   assert.equal(second.alreadyStored, 1);
   assert.equal((db.prepare("SELECT COUNT(*) AS count FROM riot_matches").get() as { count: number }).count, 1);
   assert.ok((db.prepare("SELECT last_checked_at FROM cohort_members").get() as { last_checked_at: string }).last_checked_at);
+  db.close();
+});
+
+test("extracts and stores purchase order from Match-v5 timelines", () => {
+  const timeline = { info: { frames: [
+    { timestamp: 1000, events: [{ type: "ITEM_PURCHASED", participantId: 1, itemId: 1001, timestamp: 950 }] },
+    { timestamp: 2000, events: [{ type: "CHAMPION_KILL", participantId: 1 }, { type: "ITEM_PURCHASED", participantId: 1, itemId: 3067, timestamp: 1900 }] },
+  ] } };
+  assert.deepEqual(parseItemTimeline(timeline).map((event) => event.itemId), [1001, 3067]);
+  const db = new DatabaseSync(":memory:");
+  db.exec(SCHEMA_SQL);
+  insertParsedMatch(db, parseRiotMatch(fixture, { routingRegion: "asia", platform: "kr" }));
+  assert.equal(insertItemTimeline(db, "KR_1234567890", timeline), 2);
+  assert.deepEqual((db.prepare("SELECT item_id FROM participant_item_events ORDER BY sequence_index").all() as Array<{ item_id: number }>).map((row) => row.item_id), [1001, 3067]);
   db.close();
 });
 

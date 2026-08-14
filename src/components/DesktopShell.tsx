@@ -5,13 +5,18 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const NAVIGATION = [
-  { href: "/", label: "Dashboard", icon: "⌂" },
-  { href: "/live", label: "Live", icon: "◉" },
-  { href: "/build-lab", label: "Build Lab", icon: "⌘" },
-  { href: "/history", label: "History", icon: "↺" },
-  { href: "/trophies", label: "Trophies", icon: "♛" },
-  { href: "/extreme-builds", label: "Extremes", icon: "⌁" },
-  { href: "/settings", label: "Settings", icon: "⚙" },
+  { href: "/", label: "Dashboard", icon: "DB" },
+  { href: "/live", label: "Live", icon: "LV" },
+  { href: "/build-lab", label: "Build Lab", icon: "BL" },
+  { href: "/history", label: "History", icon: "HI" },
+  { href: "/trophies", label: "Trophies", icon: "TR" },
+  { href: "/extreme-builds", label: "Extremes", icon: "EX" },
+  { href: "/tier-list", label: "Tier List", icon: "TL" },
+  { href: "/matchups", label: "Matchups", icon: "MU" },
+  { href: "/duos", label: "Duos", icon: "DU" },
+  { href: "/pros", label: "Pros", icon: "PR" },
+  { href: "/trends", label: "Trends", icon: "MT" },
+  { href: "/settings", label: "Settings", icon: "ST" },
 ] as const;
 
 type ClientStatus = { connected?: boolean; phase?: string; champion?: { name?: string } };

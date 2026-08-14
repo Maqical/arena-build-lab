@@ -37,6 +37,17 @@ The release blocker is selection completeness: augment cards and Prismatic-item 
 - Player-facing patch labels separated from raw Data Dragon build versions.
 - Fixed-point resolver, extreme-build search, conditional item recommendations, Prismatic choice comparison, and uncatalogued-ID handling.
 
+## Competitive intelligence expansion — implemented in the next release candidate
+
+- NA/KR/Global aggregation contexts and region toggles across tier, matchup, duo, pro-watch, and trend views.
+- ASIA-routed KR snowball crawler with a public Riot-ID seed registry, strict request queue, 429 backoff, deduplication, and platform-scoped targets.
+- Dynamic champion tiers, champion-vs-field placement outcomes, same-team duo lift, and five-patch trend series.
+- Match-v5 timeline ingestion into `participant_item_events` and champion-plus-augment purchase-order recommendations that exclude consumables and cheap utility items.
+- Runtime-resolved tracked-player registry, local follow state, exact setup copying, optional Twitch live status, and scheduled desktop notifications.
+- Bounded post-game performance scoring, grades, personal form trend, local record notifications, and a shareable meta report.
+
+The full KR cohort remains an operational data task, not an implementation task: save a current Riot development key in Settings, run `npm run stress:kr`, then run `npm run meta:calculate -- --stress`. No credential or resolved PUUID belongs in the repository.
+
 ## Milestone 1 — Automatic Mayhem augment intake
 
 Goal: an offered or selected Mayhem augment reaches the HUD and resolver without keyboard input.

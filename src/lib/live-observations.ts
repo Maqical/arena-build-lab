@@ -33,6 +33,7 @@ export function mergeObservedMaxima(
 }
 
 export function insertLiveObservation(db: DatabaseSync, input: LiveObservationInput): number {
+  const previous = db.prepare("SELECT MAX(observed_max_hp) hp,MAX(observed_max_ad) ad,MAX(observed_max_ap) ap FROM live_observations WHERE champion_id=?").get(input.championId) as { hp?: number; ad?: number; ap?: number } | undefined;
   const result = db.prepare(`
     INSERT INTO live_observations(
       puuid, champion_id, champion_name, augment_ids_json,
@@ -59,5 +60,15 @@ export function insertLiveObservation(db: DatabaseSync, input: LiveObservationIn
     input.source ?? "live_client",
     JSON.stringify(input.extra ?? {}),
   );
-  return Number(result.lastInsertRowid);
+  const observationId = Number(result.lastInsertRowid);
+  const records = [
+    { label: "HP", value: input.maxima.maxHealth, previous: Number(previous?.hp ?? 0) },
+    { label: "AD", value: input.maxima.attackDamage, previous: Number(previous?.ad ?? 0) },
+    { label: "AP", value: input.maxima.abilityPower, previous: Number(previous?.ap ?? 0) },
+  ].filter((record) => record.value > record.previous && record.value > 0);
+  if (records.length) {
+    const best = records.sort((left, right) => (right.value / Math.max(1, right.previous)) - (left.value / Math.max(1, left.previous)))[0];
+    db.prepare("INSERT OR IGNORE INTO notification_outbox(kind,dedupe_key,title,body,created_at) VALUES('personal_record',?,?,?,?)").run(`record:${observationId}`, `${input.championName} personal record`, `${Math.round(best.value).toLocaleString()} ${best.label} recorded locally.`, input.endedAt);
+  }
+  return observationId;
 }

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-require-imports */
-const { app, BrowserWindow, Tray, Menu, globalShortcut, desktopCapturer, clipboard, nativeImage, screen, ipcMain, utilityProcess } = require("electron");
+const { app, BrowserWindow, Tray, Menu, Notification, globalShortcut, desktopCapturer, clipboard, nativeImage, screen, ipcMain, utilityProcess } = require("electron");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
@@ -28,16 +28,20 @@ let visualDetectedFrames = 0;
 let visualMissingFrames = 0;
 let visualSession = null;
 let visualCatalogPromise;
+let notificationTimer;
+let patchNotifiedVersion = "";
+let trackedPlayerTimer;
+let trackedPlayerSyncBusy = false;
 const settingsPath = () => path.join(app.getPath("userData"), "user_settings.json");
 
 function defaultSettings() {
-  return { riotId: "", riotApiKey: process.env.RIOT_API_KEY || "", openAiApiKey: process.env.OPENAI_API_KEY || "", opacity: 1, scale: 1, openAtLogin: false, overlayBounds: null };
+  return { riotId: "", riotApiKey: process.env.RIOT_API_KEY || "", openAiApiKey: process.env.OPENAI_API_KEY || "", twitchClientId: process.env.TWITCH_CLIENT_ID || "", twitchClientSecret: process.env.TWITCH_CLIENT_SECRET || "", twitchLogins: process.env.ARENA_TWITCH_LOGINS || "", opacity: 1, scale: 1, openAtLogin: false, notifyProMatches: true, notifyPatch: true, notifyRecords: true, overlayBounds: null };
 }
 
 function readSettings() {
   try {
     const value = JSON.parse(fs.readFileSync(settingsPath(), "utf8"));
-    return { riotId: String(value.riotId ?? ""), riotApiKey: String(value.riotApiKey ?? ""), openAiApiKey: String(value.openAiApiKey ?? ""), opacity: Number(value.opacity ?? 1), scale: Number(value.scale ?? 1), openAtLogin: Boolean(value.openAtLogin), overlayBounds: normalizedBounds(value.overlayBounds) };
+    return { riotId: String(value.riotId ?? ""), riotApiKey: String(value.riotApiKey ?? ""), openAiApiKey: String(value.openAiApiKey ?? ""), twitchClientId: String(value.twitchClientId ?? ""), twitchClientSecret: String(value.twitchClientSecret ?? ""), twitchLogins: String(value.twitchLogins ?? ""), opacity: Number(value.opacity ?? 1), scale: Number(value.scale ?? 1), openAtLogin: Boolean(value.openAtLogin), notifyProMatches: value.notifyProMatches !== false, notifyPatch: value.notifyPatch !== false, notifyRecords: value.notifyRecords !== false, overlayBounds: normalizedBounds(value.overlayBounds) };
   } catch { return defaultSettings(); }
 }
 
@@ -104,14 +108,14 @@ function packagedWorker(name) {
 
 function spawnWorker(worker) {
   const settings = readSettings();
-  const env = { ...process.env, RIOT_API_KEY: settings.riotApiKey, OPENAI_API_KEY: settings.openAiApiKey, ARENA_DB_PATH: path.join(app.getPath("userData"), "data", "arena.sqlite"), ARENA_EXTREME_CSV_PATH: rootPath("data", "extreme_builds.csv") };
+  const env = { ...process.env, RIOT_API_KEY: settings.riotApiKey, OPENAI_API_KEY: settings.openAiApiKey, ARENA_DB_PATH: path.join(app.getPath("userData"), "data", "arena.sqlite"), ARENA_EXTREME_CSV_PATH: rootPath("data", "extreme_builds.csv"), ARENA_PRO_SEEDS_PATH: rootPath("data", "pro_players.seed.json") };
   if (app.isPackaged) {
     if (worker === "youtube") return { child: spawn(packagedWorker("arena-youtube-sync.exe"), ["--database", env.ARENA_DB_PATH, "--details-limit", "20", "--transcripts"], { env, windowsHide: true, stdio: "ignore" }), exitEvent: "close" };
-    const script = worker === "riot" ? packagedWorker("riot-sync.cjs") : packagedWorker("data-sync.cjs");
+    const script = worker === "riot" ? packagedWorker("riot-sync.cjs") : worker === "pros" ? packagedWorker("pro-sync.cjs") : packagedWorker("data-sync.cjs");
     const args = worker === "riot" && settings.riotId.trim() ? [`--player=${settings.riotId.trim()}`] : [];
     return { child: utilityProcess.fork(script, args, { env, cwd: app.getPath("userData"), stdio: "ignore", serviceName: `Arena ${worker} worker` }), exitEvent: "exit" };
   }
-  const command = worker === "youtube" ? "youtube:sync" : worker === "riot" ? "riot:sync" : "data:sync";
+  const command = worker === "youtube" ? "youtube:sync" : worker === "riot" ? "riot:sync" : worker === "pros" ? "pros:sync" : "data:sync";
   const npm = process.platform === "win32" ? "npm.cmd" : "npm";
   const args = ["run", command];
   if (worker === "riot" && settings.riotId.trim()) args.push("--", `--player=${settings.riotId.trim()}`);
@@ -128,7 +132,7 @@ function initializeDataIfNeeded() {
 
 function startNext() {
   const settings = readSettings();
-  const env = { ...process.env, PORT: String(PORT), HOSTNAME: "127.0.0.1", ARENA_DB_PATH: prepareUserData(), ARENA_EXTREME_CSV_PATH: rootPath("data", "extreme_builds.csv"), NEXT_TELEMETRY_DISABLED: "1", RIOT_API_KEY: settings.riotApiKey, OPENAI_API_KEY: settings.openAiApiKey };
+  const env = { ...process.env, PORT: String(PORT), HOSTNAME: "127.0.0.1", ARENA_DB_PATH: prepareUserData(), ARENA_EXTREME_CSV_PATH: rootPath("data", "extreme_builds.csv"), NEXT_TELEMETRY_DISABLED: "1", RIOT_API_KEY: settings.riotApiKey, OPENAI_API_KEY: settings.openAiApiKey, TWITCH_CLIENT_ID: settings.twitchClientId, TWITCH_CLIENT_SECRET: settings.twitchClientSecret, ARENA_TWITCH_LOGINS: settings.twitchLogins };
   if (app.isPackaged) {
     serverProcess = utilityProcess.fork(rootPath("standalone", "server.js"), [], { cwd: rootPath("standalone"), env, stdio: "ignore", serviceName: "Arena local server" });
   } else {
@@ -547,6 +551,54 @@ function createTray() {
   tray.on("double-click", () => openDashboard());
 }
 
+async function pollDesktopNotifications() {
+  if (!Notification.isSupported()) return;
+  const settings = readSettings();
+  try {
+    const response = await fetch(`http://127.0.0.1:${PORT}/api/notifications`, { signal: AbortSignal.timeout(4_000) });
+    if (response.ok) {
+      const payload = await response.json();
+      const pending = Array.isArray(payload.notifications) ? payload.notifications : [];
+      const enabled = pending.filter((entry) => entry.kind === "pro_match" ? settings.notifyProMatches : entry.kind === "personal_record" ? settings.notifyRecords : true);
+      for (const entry of enabled) new Notification({ title: String(entry.title), body: String(entry.body), icon: appIconPath() }).show();
+      if (pending.length) await fetch(`http://127.0.0.1:${PORT}/api/notifications`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: pending.map((entry) => entry.id) }), signal: AbortSignal.timeout(4_000) });
+    }
+    if (settings.notifyPatch) {
+      const patchResponse = await fetch(`http://127.0.0.1:${PORT}/api/patch-status`, { signal: AbortSignal.timeout(6_000) });
+      if (patchResponse.ok) {
+        const patch = await patchResponse.json();
+        if (patch.stale && patch.livePatch && patchNotifiedVersion !== patch.livePatch) {
+          patchNotifiedVersion = patch.livePatch;
+          new Notification({ title: `League patch ${patch.liveDisplayPatch || patch.livePatch} available`, body: "Open Settings to sync the latest local game data.", icon: appIconPath() }).show();
+        }
+      }
+    }
+  } catch { /* The local service may be restarting; the next interval retries. */ }
+}
+
+function startDesktopNotifications() {
+  clearInterval(notificationTimer);
+  void pollDesktopNotifications();
+  notificationTimer = setInterval(() => void pollDesktopNotifications(), 30_000);
+}
+
+function syncTrackedPlayersInBackground() {
+  const settings = readSettings();
+  if (trackedPlayerSyncBusy || !settings.notifyProMatches || !settings.riotApiKey) return;
+  trackedPlayerSyncBusy = true;
+  try {
+    const worker = spawnWorker("pros");
+    const done = () => { trackedPlayerSyncBusy = false; void pollDesktopNotifications(); };
+    worker.child.once("error", done);
+    worker.child.once(worker.exitEvent, done);
+  } catch { trackedPlayerSyncBusy = false; }
+}
+
+function startTrackedPlayerSchedule() {
+  clearInterval(trackedPlayerTimer);
+  trackedPlayerTimer = setInterval(syncTrackedPlayersInBackground, 60 * 60 * 1_000);
+}
+
 ipcMain.handle("settings:get", () => readSettings());
 ipcMain.handle("settings:save", async (_event, next) => {
   try {
@@ -559,8 +611,8 @@ ipcMain.handle("settings:save", async (_event, next) => {
 ipcMain.handle("appearance:apply", (_event, next) => applyAppearance(next || appearance));
 ipcMain.handle("window:overlay", () => { openOverlay(); return { ok: true }; });
 ipcMain.handle("worker:run", (_event, worker) => {
-  const selected = worker === "youtube" ? "youtube" : worker === "data" ? "data" : "riot";
-  const label = selected === "youtube" ? "YouTube catalog" : selected === "data" ? "Data Dragon" : "Riot match";
+  const selected = worker === "youtube" ? "youtube" : worker === "data" ? "data" : worker === "pros" ? "pros" : "riot";
+  const label = selected === "youtube" ? "YouTube catalog" : selected === "data" ? "Data Dragon" : selected === "pros" ? "Tracked player" : "Riot match";
   try {
     const workerProcess = spawnWorker(selected);
     return new Promise((resolve) => {
@@ -591,6 +643,8 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
   startOverwolfAugmentProvider();
   void visualCatalogTemplates().catch(() => {});
   startVisualAugmentWatcher();
+  startDesktopNotifications();
+  startTrackedPlayerSchedule();
   globalShortcut.register("CommandOrControl+Shift+A", () => void capturePicker());
   app.setLoginItemSettings({ openAtLogin: saved.openAtLogin });
 });
@@ -600,6 +654,8 @@ app.on("will-quit", () => {
   if (windowMode === "overlay" && mainWindow && !mainWindow.isDestroyed()) writeSettings({ overlayBounds: mainWindow.getBounds() });
   clearTimeout(boundsSaveTimer);
   clearInterval(visualWatcherTimer);
+  clearInterval(notificationTimer);
+  clearInterval(trackedPlayerTimer);
   globalShortcut.unregisterAll();
   if (serverProcess) serverProcess.kill();
 });

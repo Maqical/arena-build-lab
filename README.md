@@ -4,11 +4,11 @@ Arena Build Lab is a Windows companion for League of Legends Arena and ARAM: May
 
 It combines live game context, automatic and assisted augment intake, recursive stat-conversion math, champion-specific build guidance, personal match history, and a local match warehouse. The application is read-only: it observes supported game/client data and never controls gameplay.
 
-Current desktop version: **v1.0.7**
+Current desktop version: **v1.1.0 release candidate**
 
 ## Install
 
-Run `Arena-Build-Lab-1.0.7-Setup.exe`. The installer creates Start Menu and desktop shortcuts and preserves the local warehouse under `%APPDATA%\Arena Build Lab` during upgrades.
+Run `Arena-Build-Lab-1.1.0-Setup.exe`. The installer creates Start Menu and desktop shortcuts and preserves the local warehouse under `%APPDATA%\Arena Build Lab` during upgrades.
 
 On first launch:
 
@@ -44,6 +44,10 @@ The companion-product benchmark and Frbz feature synthesis live in [docs/compani
 - Extreme Build Browser for health, AD, AP, attack speed, haste, movement speed, crit damage, and on-hit objectives.
 - Champion-plus-augment item recommendations derived from the local participant cohort; low samples are labelled rather than replaced with unrelated global items.
 - Immutable Match-v5 warehouse, patch/region meta snapshots, personal match history, and transient-stat trophy records.
+- Region-scoped NA/KR/Global tier lists, matchup context, duo synergy, patch trends, and shareable local meta reports.
+- Public tracked-player registry with follow state, exact recorded build copying, scheduled local refreshes, and optional Twitch live status.
+- Timeline-derived champion-plus-augment purchase order, post-game performance grades, and personal performance trends.
+- Native desktop notifications for tracked-player matches, patch refreshes, and personal stat records.
 - Configurable video evidence catalog with timestamped entity links.
 
 ## Development
@@ -62,12 +66,15 @@ Useful commands:
 
 ```powershell
 npm run riot:sync -- --player="Your Riot ID#NA1" --count=20
-npm run meta:calculate
+npm run stress:kr
+npm run pros:sync
+npm run meta:calculate -- --stress
 npm run find-extreme
 npm run audit:lcu -- --duration=60 --interval=5
 npm run lint
 npx tsc --noEmit
 npm test
+npm run test:competitive-ui
 npm run build
 npm run electron:build
 ```
@@ -79,7 +86,9 @@ npm run electron:build
 - CommunityDragon/Data Dragon supply patch-aware champions, augments, items, icons, and structured descriptions.
 - Match-v5 responses are stored immutably in `riot_matches` and `riot_participants`.
 - `participant_augments` projects selections into an indexed query surface.
+- `participant_item_events` retains immutable Match-v5 purchase order without mixing it into final inventory.
 - `meta_snapshots` stores repeatable local aggregates by source, patch, region, champion, and selection.
+- `pro_players` and `followed_players` separate a public seed registry from private runtime PUUIDs and local follow preferences.
 - `live_observations` preserves transient peaks that final match payloads may not retain.
 - Uncatalogued numeric selections remain intact and display as `Uncatalogued selection (ID: XXX)` until a later catalog refresh resolves them.
 

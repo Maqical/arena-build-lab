@@ -2,9 +2,10 @@ import "server-only";
 
 import { getDatabase, jsonArray } from "@/lib/db";
 import { uncataloguedSelectionLabel } from "@/lib/selection-label";
+import { gradeParticipant } from "@/lib/competitive-insights";
 
 type Row = Record<string, unknown>;
-export type PostGameAnalysisResult = { championName: string; peakHp: number; peakAd: number; peakAp: number; personalRecord: boolean; picked: string[]; suggested: Array<{ name: string; firstPlaceRate: number; sampleSize: number }> };
+export type PostGameAnalysisResult = { championName: string; peakHp: number; peakAd: number; peakAp: number; personalRecord: boolean; picked: string[]; suggested: Array<{ name: string; firstPlaceRate: number; sampleSize: number }>; score: number | null; grade: string };
 
 export function getPostGameAnalysis(championName = ""): PostGameAnalysisResult | null {
   const db = getDatabase();
@@ -23,5 +24,7 @@ export function getPostGameAnalysis(championName = ""): PostGameAnalysisResult |
   `).all(championId) as Row[];
   const peakHp = Number(observation.observed_max_hp ?? 0);
   const previous = db.prepare("SELECT MAX(observed_max_hp) value FROM live_observations WHERE id<>? AND champion_id=?").get(Number(observation.id), championId) as Row | undefined;
-  return { championName: String(observation.champion_name), peakHp, peakAd: Number(observation.observed_max_ad ?? 0), peakAp: Number(observation.observed_max_ap ?? 0), personalRecord: peakHp > Number(previous?.value ?? 0), picked: pickedNames, suggested: suggestions.map((row) => ({ name: String(row.name ?? row.entity_key), firstPlaceRate: Number(row.value ?? 0), sampleSize: Number(row.sample_size ?? 0) })) };
+  const participant = db.prepare(`SELECT rp.match_id,rp.participant_index FROM riot_participants rp JOIN riot_matches rm ON rm.match_id=rp.match_id WHERE rp.champion_id=? AND (?='' OR rp.puuid=?) ORDER BY rm.started_at DESC LIMIT 1`).get(championId, String(observation.puuid ?? ""), String(observation.puuid ?? "")) as Row | undefined;
+  const performance = participant ? gradeParticipant(String(participant.match_id), Number(participant.participant_index)) : null;
+  return { championName: String(observation.champion_name), peakHp, peakAd: Number(observation.observed_max_ad ?? 0), peakAp: Number(observation.observed_max_ap ?? 0), personalRecord: peakHp > Number(previous?.value ?? 0), picked: pickedNames, suggested: suggestions.map((row) => ({ name: String(row.name ?? row.entity_key), firstPlaceRate: Number(row.value ?? 0), sampleSize: Number(row.sample_size ?? 0) })), score: performance?.score ?? null, grade: performance?.grade ?? "Pending" };
 }

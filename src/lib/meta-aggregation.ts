@@ -2,12 +2,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { SCHEMA_SQL } from "@/lib/schema";
+import { companionRegion } from "@/lib/region";
 
 type Row = Record<string, unknown>;
 
 type Participant = {
   matchId: string;
   routingRegion: string;
+  region: string;
   platform: string;
   patch: string;
   championId: number;
@@ -68,6 +70,7 @@ function rowsFor(db: DatabaseSync): Participant[] {
   return rows.map((row) => ({
     matchId: String(row.match_id),
     routingRegion: String(row.routing_region),
+    region: companionRegion(String(row.platform), String(row.routing_region)),
     platform: String(row.platform),
     patch: String(row.patch),
     championId: Number(row.champion_id),
@@ -119,13 +122,15 @@ export function calculateMeta(databasePath = path.resolve(process.cwd(), process
   const championAugmentAggregates = new Map<string, Aggregate>();
 
   for (const participant of participants) {
-    const contextKey = key([participant.routingRegion, participant.platform, participant.patch]);
-    totalByContext.set(contextKey, (totalByContext.get(contextKey) ?? 0) + 1);
-    const championKey = key([contextKey, participant.championId]);
-    aggregateRow(championAggregates, championKey, participant);
-    for (const augmentId of participant.augmentIds) {
-      aggregateRow(augmentAggregates, key([contextKey, augmentId]), participant);
-      aggregateRow(championAugmentAggregates, key([contextKey, participant.championId, augmentId]), participant);
+    for (const [region, platform] of [[participant.region, participant.platform], ["global", "all"]] as const) {
+      const contextKey = key([region, platform, participant.patch]);
+      totalByContext.set(contextKey, (totalByContext.get(contextKey) ?? 0) + 1);
+      const championKey = key([contextKey, participant.championId]);
+      aggregateRow(championAggregates, championKey, participant);
+      for (const augmentId of participant.augmentIds) {
+        aggregateRow(augmentAggregates, key([contextKey, augmentId]), participant);
+        aggregateRow(championAugmentAggregates, key([contextKey, participant.championId, augmentId]), participant);
+      }
     }
   }
 
@@ -175,7 +180,7 @@ export function calculateMeta(databasePath = path.resolve(process.cwd(), process
   } finally {
     db.close();
   }
-  return { matches: matches.size, participants: participants.length, snapshots: snapshotCount, regions: [...new Set(participants.map((row) => row.routingRegion))], patches: [...new Set(participants.map((row) => row.patch))] };
+  return { matches: matches.size, participants: participants.length, snapshots: snapshotCount, regions: [...new Set([...participants.map((row) => row.region), "global"])], patches: [...new Set(participants.map((row) => row.patch))] };
 }
 
 export function runMetaCalculation(): void {

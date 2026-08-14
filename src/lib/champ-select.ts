@@ -4,6 +4,7 @@ import { getDatabase } from "@/lib/db";
 import { getExtremeBuildCsvRows } from "@/lib/extreme-build-csv";
 import type { ChampSelectEntityRecommendation, ChampSelectRecommendation, DuoRecommendation } from "@/lib/champ-select-types";
 import { getDuoSynergies } from "@/lib/duo-synergy";
+import { championMatchups } from "@/lib/competitive-insights";
 
 type Row = Record<string, unknown>;
 type CandidateScore = { score: number; reasons: Set<string> };
@@ -140,6 +141,10 @@ export function getChampSelectRecommendation(championReference: string | number)
       },
     };
   }).filter((entry) => entry.recommendation.fitTags.length > 0 || (entry.recommendation.gamesTogether ?? 0) > 0).sort((left, right) => right.score - left.score).slice(0, 4).map((entry) => entry.recommendation);
+  const matchupRows = championMatchups(championId, "global", 80);
+  const mappedMatchup = (row: (typeof matchupRows)[number]) => ({ championId: row.championId, name: row.name, iconUrl: row.iconUrl, games: row.games, aheadRate: row.aheadRate });
+  const favorableMatchups = [...matchupRows].sort((left, right) => right.aheadRate - left.aheadRate).slice(0, 3).map(mappedMatchup);
+  const difficultMatchups = [...matchupRows].sort((left, right) => left.aheadRate - right.aheadRate).slice(0, 3).map(mappedMatchup);
 
   return {
     champion: { id: championId, key: championKey, name: championName, iconUrl: String(champion.icon_url), tags: championTags },
@@ -148,9 +153,11 @@ export function getChampSelectRecommendation(championReference: string | number)
       pickRate: championMeta.pick_rate == null ? null : Number(championMeta.pick_rate), patch: String(championMeta.patch),
     } : null,
     duoRecommendations,
+    favorableMatchups,
+    difficultMatchups,
     recommendedAugments: ranked(augmentScores, 5),
     recommendedItems: ranked(itemScores, 3),
     extremeBuilds: extremeBuilds.slice(0, 4),
-    note: "Duo candidates use complementary champion roles plus individual Arena meta; they are not direct duo win-rate claims. Build recommendations use local extreme benchmarks and curated conversion paths.",
+    note: "Duo and matchup guidance is calculated from source-labelled local match outcomes. Build recommendations use local extreme benchmarks and curated conversion paths.",
   };
 }

@@ -1,0 +1,3 @@
+import { tierList } from "@/lib/competitive-insights";import { selectedRegion } from "@/lib/region";
+export const runtime="nodejs";export const dynamic="force-dynamic";
+export function GET(request:Request){const region=selectedRegion(new URL(request.url).searchParams.get("region")),rows=tierList(region);if(!rows.length)return Response.json({region,report:""});const leading=rows.slice(0,5).map((row,index)=>`${index+1}. ${row.name} — ${(row.firstPlaceRate*100).toFixed(1)}% first, ${(row.top4Rate*100).toFixed(1)}% top 4 (${row.sampleSize} games)`).join("\n");return Response.json({region,report:`Arena Build Lab ${region.toUpperCase()} local meta report · patch ${rows[0].patch}\n${leading}\n\nSource: local source-labelled match warehouse.`});}
