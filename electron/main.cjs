@@ -285,7 +285,7 @@ async function visualCatalogTemplates() {
           }
           const image = nativeImage.createFromBuffer(bytes);
           if (image.isEmpty()) continue;
-          const templateSize = entity.kind === "item" ? 64 : 128;
+          const templateSize = entity.kind === "item" ? 96 : 128;
           templates.push({ entityKey: entity.entityKey, kind: entity.kind, name: entity.name, bitmap: image.resize({ width: templateSize, height: templateSize, quality: "best" }).toBitmap() });
         } catch { /* One missing icon must not disable the visual catalog. */ }
       }
@@ -321,24 +321,31 @@ async function matchVisualOffers(thumbnail) {
         }
       }
       const ranked = [...bestByEntity.values()].sort((left, right) => right.score - left.score);
-      const best = ranked[0];
-      const runnerUp = ranked.find((candidate) => candidate.name !== best?.name);
+      const deduped = [];
+      for (const candidate of ranked) if (!deduped.some((seen) => seen.name === candidate.name)) deduped.push(candidate);
+      const best = deduped[0];
+      const runnerUp = deduped[1];
       results.push({ entityKey: best?.entityKey ?? "", name: best?.name ?? "", score: best?.score ?? -1, margin: best ? best.score - (runnerUp?.score ?? -1) : -1, variant: best?.variant ?? null });
     }
     const accepted = results.length === 3 && results.every((result) => result.entityKey && result.score >= minimumScore && result.margin >= minimumMargin);
     return { kind, matches: results, confidence: Math.min(...results.map((result) => result.score)), accepted };
   };
-  const augment = matchKind("augment", [{ y: 0.2935, size: 0.0933 }], 128, 0.82, 0.045);
+  const augment = matchKind("augment", [{ y: 0.2935, size: 0.0933 }], 128, 0.82, 0.03);
   // Prismatic art is smaller than augment art and shifts vertically across
   // Arena/Mayhem UI scales. Search bounded icon-sized crops inside each card.
   const item = matchKind("item", [
+    { y: 0.24, size: 0.036 }, { y: 0.24, size: 0.046 }, { y: 0.24, size: 0.058 },
     { y: 0.27, size: 0.036 }, { y: 0.27, size: 0.046 }, { y: 0.27, size: 0.058 },
     { y: 0.294, size: 0.036 }, { y: 0.294, size: 0.046 }, { y: 0.294, size: 0.058 },
     { y: 0.32, size: 0.036 }, { y: 0.32, size: 0.046 }, { y: 0.32, size: 0.058 },
-  ], 64, 0.74, 0.03);
+    { y: 0.35, size: 0.036 }, { y: 0.35, size: 0.046 }, { y: 0.35, size: 0.058 },
+  ], 96, 0.58, 0.025);
   const accepted = [augment, item].filter((candidate) => candidate.accepted).sort((left, right) => right.confidence - left.confidence);
+  const provisional = accepted.length === 0 && item.matches.every((match) => match.entityKey && match.score >= 0.5 && match.margin >= 0.02) && !augment.matches.every((match) => match.entityKey && match.score >= 0.82 && match.margin >= 0.03)
+    ? [{ kind: "item", matches: item.matches, confidence: item.confidence, accepted: false, provisional: true }]
+    : [];
   return {
-    match: accepted[0] ?? null,
+    match: accepted[0] ?? provisional[0] ?? null,
     diagnostics: {
       augment: { accepted: augment.accepted, confidence: augment.confidence, cards: augment.matches.map(({ name, score, margin }) => ({ name, score, margin })) },
       item: { accepted: item.accepted, confidence: item.confidence, cards: item.matches.map(({ name, score, margin, variant }) => ({ name, score, margin, variant })) },
@@ -374,6 +381,8 @@ async function scanVisualOffers(thumbnail, snapshot, session) {
       const offered = localMatches.matches.map((match) => match.entityKey);
       await localJson("/api/lcu/visual-event", "POST", { kind: localMatches.kind, offered });
       result = { offered, kind: localMatches.kind };
+    } else if (!settings.openAiApiKey) {
+      result = null;
     } else {
       const size = thumbnail.getSize();
       const width = Math.min(1600, size.width);
@@ -382,7 +391,7 @@ async function scanVisualOffers(thumbnail, snapshot, session) {
       result = await localJson("/api/lcu/visual-scan", "POST", { screenshotDataUrl, sequence: snapshot.sequence });
       result.kind = "augment";
     }
-    if (visualSession === session) {
+    if (visualSession === session && result) {
       session.offered = result.offered;
       session.kind = result.kind;
       maybeConfirmVisualPick();
