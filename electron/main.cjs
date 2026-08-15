@@ -133,9 +133,9 @@ function initializeDataIfNeeded() {
 function seedVideoCatalogIfNeeded() {
   const seed = rootPath("data", "videos.seed.sqlite");
   if (!fs.existsSync(seed)) return;
-  const env = { ...process.env, ARENA_DB_PATH: path.join(app.getPath("userData"), "data", "arena.sqlite"), ARENA_VIDEO_SEED_PATH: seed };
+  const env = { ...process.env, ARENA_DB_PATH: path.join(app.getPath("userData"), "data", "arena.sqlite"), ARENA_VIDEO_SEED_PATH: seed, ARENA_EXTREME_CSV_PATH: rootPath("data", "extreme_builds.csv") };
   if (app.isPackaged) {
-    const worker = utilityProcess.fork(packagedWorker("seed-videos.cjs"), [], { env, cwd: app.getPath("userData"), stdio: "ignore", serviceName: "Arena video seed worker" });
+    const worker = utilityProcess.fork(packagedWorker("seed-data.cjs"), [], { env, cwd: app.getPath("userData"), stdio: "ignore", serviceName: "Arena seed worker" });
     worker.once("exit", () => {});
   } else {
     const npx = process.platform === "win32" ? "npx.cmd" : "npx";

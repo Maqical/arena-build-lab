@@ -4,30 +4,88 @@ import { DatabaseSync } from "node:sqlite";
 import { SCHEMA_SQL } from "../src/lib/schema";
 import { rebuildVideoCombos } from "../src/lib/video-combos";
 import { extractVideoStatClaims } from "../src/lib/video-stat-claims";
+import { parseExtremeBuildCsv } from "../src/lib/extreme-build-csv-core";
 
 /**
- * Packaged-app worker (build-workers/seed-videos.cjs): imports the bundled
+ * Packaged-app worker (build-workers/seed-data.cjs): imports the bundled
  * video catalog seed into the AppData database on first run so the Video
- * evidence tab works without a live YouTube sync. Idempotent: exits early
- * when the videos table already has rows. Remaps seed champion_key rows
- * onto the target DB's champions.id and drops mentions whose entity keys
- * are not in the local catalog.
+ * evidence tab works without a live YouTube sync, and imports the bundled
+ * extreme-build CSV into the extreme_builds table when it is empty.
+ * Idempotent per table: skips sections whose target table already has rows.
+ * Remaps seed champion_key rows onto the target DB's champions.id and drops
+ * mentions whose entity keys are not in the local catalog.
  */
 const seedPath = path.resolve(process.cwd(), process.env.ARENA_VIDEO_SEED_PATH ?? "data/videos.seed.sqlite");
 const filename = path.resolve(process.cwd(), process.env.ARENA_DB_PATH ?? "data/arena.sqlite");
-if (!fs.existsSync(seedPath)) {
-  console.log(JSON.stringify({ seeded: 0, skipped: "seed-missing", database: filename }));
-  process.exit(0);
-}
+const extremeCsvPath = path.resolve(process.cwd(), process.env.ARENA_EXTREME_CSV_PATH ?? "data/extreme_builds.csv");
 
 const db = new DatabaseSync(filename);
 db.exec(SCHEMA_SQL);
 db.exec("PRAGMA busy_timeout = 10000");
 db.exec("PRAGMA foreign_keys = OFF");
 
+function sleepSync(milliseconds: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
+}
+
+function importExtremeBuildsIfEmpty(target: DatabaseSync, csvPath: string): number {
+  const existing = Number((target.prepare("SELECT COUNT(*) AS count FROM extreme_builds").get() as { count: number }).count ?? 0);
+  if (existing > 0 || !fs.existsSync(csvPath)) return 0;
+  for (let attempt = 0; attempt < 90; attempt += 1) {
+    const champions = Number((target.prepare("SELECT COUNT(*) AS count FROM champions").get() as { count: number }).count ?? 0);
+    if (champions > 0) break;
+    sleepSync(1000);
+  }
+  const rows = parseExtremeBuildCsv(fs.readFileSync(csvPath, "utf8"));
+  if (!rows.length) return 0;
+  const championKeyByName = new Map<string, string>();
+  for (const champion of target.prepare("SELECT champion_key, name FROM champions").all() as Array<{ champion_key: string; name: string }>) {
+    championKeyByName.set(champion.name, champion.champion_key);
+    championKeyByName.set(champion.name.toLowerCase().replace(/[^a-z0-9]/g, ""), champion.champion_key);
+  }
+  const entityByKindName = new Map<string, Map<string, string>>();
+  for (const entity of target.prepare("SELECT entity_key, name, kind FROM entities").all() as Array<{ entity_key: string; name: string; kind: string }>) {
+    const byName = entityByKindName.get(entity.kind) ?? new Map<string, string>();
+    byName.set(entity.name, entity.entity_key);
+    byName.set(entity.name.toLowerCase().replace(/[^a-z0-9]/g, ""), entity.entity_key);
+    entityByKindName.set(entity.kind, byName);
+  }
+  const keyFor = (kind: string, display: string) => entityByKindName.get(kind)?.get(display) ?? "";
+  const patch = String((target.prepare("SELECT value FROM metadata WHERE key = 'patch'").get() as { value?: string } | undefined)?.value ?? "unknown");
+  const now = new Date().toISOString();
+  const insert = target.prepare(`
+    INSERT INTO extreme_builds(champion_key, champion_name, level, objective, result_rank, score,
+      theoretical_unbounded, unbounded_reason, status, stats_json, augment_keys_json, augments_json,
+      scenario_name, scenario_json, iterations, delta, patch, generated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)
+  `);
+  target.exec("BEGIN");
+  try {
+    for (const row of rows) {
+      const championKey = championKeyByName.get(row.champion) ?? row.champion.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const augmentEffects = row.augments.map((name) => ({ name, kind: "augment" as const, key: keyFor("augment", name), rank: 0, rarity: "" })).filter((effect) => effect.key);
+      const itemEffects = row.fixedItems.map((name) => ({ name, kind: "item" as const, key: keyFor("item", name), rank: 0, rarity: "" })).filter((effect) => effect.key);
+      const effects = [...augmentEffects, ...itemEffects];
+      const scenarioName = String(row.scenario.name ?? "high-stack-benchmark-v1");      insert.run(
+        championKey, row.champion, row.level, row.objective, row.rank, row.benchmarkScore,
+        row.theoreticalUnbounded ? 1 : 0, "", row.status,
+        JSON.stringify(row.stats),
+        JSON.stringify(effects.map((effect) => effect.key)), JSON.stringify(effects),
+        scenarioName, JSON.stringify(row.scenario), patch, now,
+      );
+    }
+    target.exec("COMMIT");
+  } catch (error) {
+    target.exec("ROLLBACK");
+    throw error;
+  }
+  return rows.length;
+}
+
 const existing = db.prepare("SELECT COUNT(*) AS count FROM videos").get() as { count: number };
 if (Number(existing.count) > 0) {
-  console.log(JSON.stringify({ seeded: 0, skipped: "videos-present", database: filename }));
+  const extremeSeeded = importExtremeBuildsIfEmpty(db, extremeCsvPath);
+  console.log(JSON.stringify({ seeded: 0, skipped: "videos-present", extremeSeeded, database: filename }));
   db.close();
   process.exit(0);
 }
@@ -78,6 +136,7 @@ seed.close();
 const patch = String((db.prepare("SELECT value FROM metadata WHERE key = 'patch'").get() as { value?: string } | undefined)?.value ?? "unknown");
 const combos = rebuildVideoCombos(db, patch);
 const claims = extractVideoStatClaims(db);
+const extremeSeeded = importExtremeBuildsIfEmpty(db, extremeCsvPath);
 db.exec("PRAGMA foreign_keys = ON");
-console.log(JSON.stringify({ seeded: Number(db.prepare("SELECT COUNT(*) AS count FROM videos").get()?.count ?? 0), combos, claims: claims.inserted, database: filename }, null, 2));
+console.log(JSON.stringify({ seeded: Number(db.prepare("SELECT COUNT(*) AS count FROM videos").get()?.count ?? 0), combos, claims: claims.inserted, extremeSeeded, database: filename }, null, 2));
 db.close();

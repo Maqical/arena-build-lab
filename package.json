@@ -124,8 +124,8 @@
         "to": "workers/data-sync.cjs"
       },
       {
-        "from": "build-workers/seed-videos.cjs",
-        "to": "workers/seed-videos.cjs"
+        "from": "build-workers/seed-data.cjs",
+        "to": "workers/seed-data.cjs"
       },
       {
         "from": "build-workers/videos.seed.sqlite",
