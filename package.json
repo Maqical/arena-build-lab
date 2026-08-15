@@ -1,6 +1,6 @@
 {
   "name": "arena-build-lab",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "private": true,
   "main": "electron/main.cjs",
   "description": "Local-first League of Legends Arena and ARAM: Mayhem companion overlay",
@@ -44,6 +44,9 @@
     "youtube:sync": ".venv\\Scripts\\python.exe workers/youtube_catalog.py --details-limit 20 --transcripts",
     "youtube:link": ".venv\\Scripts\\python.exe workers/youtube_catalog.py --link-only && npm run videos:combos",
     "videos:combos": "tsx scripts/sync-video-combos.ts",
+    "videos:seed": "tsx scripts/build-video-seed.ts",
+    "videos:stats": "tsx scripts/extract-video-stats.ts",
+    "videos:all": "npm run videos:combos && npm run videos:stats",
     "setup": "npm run data:sync",
     "electron:dev": "npm run build && electron electron/main.cjs",
     "build:workers": "python scripts/build_workers.py",
@@ -119,6 +122,14 @@
       {
         "from": "build-workers/data-sync.cjs",
         "to": "workers/data-sync.cjs"
+      },
+      {
+        "from": "build-workers/seed-videos.cjs",
+        "to": "workers/seed-videos.cjs"
+      },
+      {
+        "from": "build-workers/videos.seed.sqlite",
+        "to": "data/videos.seed.sqlite"
       }
     ],
     "win": {

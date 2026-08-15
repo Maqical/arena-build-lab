@@ -3,7 +3,7 @@ import "server-only";
 import { getDatabase, jsonArray } from "@/lib/db";
 import { normalizedSelectionKey, selectionNumericId, uncataloguedSelectionLabel } from "@/lib/selection-label";
 import { displayPatchVersion } from "@/lib/patch-version";
-import type { CatalogEntity, Champion, Combo, EntityKind, EntityOption, StatFormula, StatKey, Video } from "@/lib/types";
+import type { CatalogEntity, Champion, Combo, EntityKind, EntityOption, StatFormula, StatKey, Video, VideoStatClaim } from "@/lib/types";
 
 type EntityRow = Record<string, unknown>;
 
@@ -444,4 +444,36 @@ export function searchVideos(options: { query?: string; champion?: string; limit
       })),
     };
   });
+}
+
+export function searchVideoStatClaims(options: { champion?: string; statKey?: string; query?: string; limit?: number }): VideoStatClaim[] {
+  const db = getDatabase();
+  const champion = (options.champion ?? "").trim();
+  const statKey = (options.statKey ?? "").trim();
+  const query = `%${(options.query ?? "").trim()}%`;
+  const limit = Math.min(Math.max(options.limit ?? 60, 1), 200);
+  const rows = db.prepare(`
+    SELECT vsc.video_id, vsc.champion_key, vsc.stat_key, vsc.stat_label, vsc.value,
+      vsc.unit, vsc.evidence_text, vsc.source, vsc.confidence, v.title, v.url, v.published_at
+    FROM video_stat_claims vsc
+    JOIN videos v ON v.video_id = vsc.video_id
+    WHERE (? = '' OR vsc.champion_key = ? OR v.title LIKE ?)
+      AND (? = '' OR vsc.stat_key = ?)
+    ORDER BY vsc.confidence DESC, vsc.value DESC, v.published_at DESC
+    LIMIT ?
+  `).all(champion, champion, query, statKey, statKey, limit) as EntityRow[];
+  return rows.map((row) => ({
+    videoId: String(row.video_id),
+    championKey: String(row.champion_key),
+    statKey: String(row.stat_key),
+    statLabel: String(row.stat_label),
+    value: Number(row.value),
+    unit: String(row.unit),
+    evidenceText: String(row.evidence_text),
+    source: String(row.source),
+    confidence: Number(row.confidence),
+    title: String(row.title),
+    url: String(row.url),
+    publishedAt: String(row.published_at ?? ""),
+  }));
 }

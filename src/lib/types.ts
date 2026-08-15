@@ -168,3 +168,18 @@ export type Video = {
     confidence: number;
   }>;
 };
+
+export type VideoStatClaim = {
+  videoId: string;
+  championKey: string;
+  statKey: string;
+  statLabel: string;
+  value: number;
+  unit: string;
+  evidenceText: string;
+  source: string;
+  confidence: number;
+  title: string;
+  url: string;
+  publishedAt: string;
+};

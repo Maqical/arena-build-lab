@@ -130,6 +130,20 @@ function initializeDataIfNeeded() {
   worker.child.on(worker.exitEvent, () => { dataInitializing = false; if (mainWindow && !mainWindow.isDestroyed()) openOverlay(); });
 }
 
+function seedVideoCatalogIfNeeded() {
+  const seed = rootPath("data", "videos.seed.sqlite");
+  if (!fs.existsSync(seed)) return;
+  const env = { ...process.env, ARENA_DB_PATH: path.join(app.getPath("userData"), "data", "arena.sqlite"), ARENA_VIDEO_SEED_PATH: seed };
+  if (app.isPackaged) {
+    const worker = utilityProcess.fork(packagedWorker("seed-videos.cjs"), [], { env, cwd: app.getPath("userData"), stdio: "ignore", serviceName: "Arena video seed worker" });
+    worker.once("exit", () => {});
+  } else {
+    const npx = process.platform === "win32" ? "npx.cmd" : "npx";
+    const child = spawn(npx, ["tsx", path.join(__dirname, "..", "scripts", "seed-video-catalog.ts")], { cwd: path.resolve(__dirname, ".."), env, detached: true, stdio: "ignore", windowsHide: true });
+    child.once("close", () => {});
+  }
+}
+
 function startNext() {
   const settings = readSettings();
   const env = { ...process.env, PORT: String(PORT), HOSTNAME: "127.0.0.1", ARENA_DB_PATH: prepareUserData(), ARENA_EXTREME_CSV_PATH: rootPath("data", "extreme_builds.csv"), NEXT_TELEMETRY_DISABLED: "1", RIOT_API_KEY: settings.riotApiKey, OPENAI_API_KEY: settings.openAiApiKey, TWITCH_CLIENT_ID: settings.twitchClientId, TWITCH_CLIENT_SECRET: settings.twitchClientSecret, ARENA_TWITCH_LOGINS: settings.twitchLogins };
@@ -644,6 +658,7 @@ if (hasSingleInstanceLock) app.whenReady().then(async () => {
   const saved = readSettings();
   appearance = { opacity: saved.opacity, scale: saved.scale };
   initializeDataIfNeeded();
+  seedVideoCatalogIfNeeded();
   startNext();
   await waitForServer();
   createWindow();

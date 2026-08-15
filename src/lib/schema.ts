@@ -121,6 +121,24 @@ CREATE TABLE IF NOT EXISTS video_champions (
 CREATE INDEX IF NOT EXISTS video_champions_video_idx ON video_champions(video_id);
 CREATE INDEX IF NOT EXISTS video_champions_champion_idx ON video_champions(champion_id);
 
+CREATE TABLE IF NOT EXISTS video_stat_claims (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  video_id TEXT NOT NULL REFERENCES videos(video_id) ON DELETE CASCADE,
+  champion_key TEXT NOT NULL DEFAULT '',
+  stat_key TEXT NOT NULL,
+  stat_label TEXT NOT NULL,
+  value REAL NOT NULL,
+  unit TEXT NOT NULL DEFAULT '',
+  evidence_text TEXT NOT NULL,
+  source TEXT NOT NULL DEFAULT 'title',
+  confidence REAL NOT NULL,
+  created_at TEXT NOT NULL,
+  UNIQUE(video_id, champion_key, stat_key, value, evidence_text)
+);
+
+CREATE INDEX IF NOT EXISTS video_stat_claims_video_idx ON video_stat_claims(video_id);
+CREATE INDEX IF NOT EXISTS video_stat_claims_champion_idx ON video_stat_claims(champion_key);
+
 CREATE TABLE IF NOT EXISTS personal_runs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   played_at TEXT NOT NULL,

@@ -24,7 +24,8 @@ def main() -> None:
     pyinstaller = str(PYINSTALLER if PYINSTALLER.exists() else "pyinstaller")
     run([pyinstaller, "--noconfirm", "--clean", "--onefile", "--name", "arena-youtube-sync", "--distpath", str(OUTPUT), "--workpath", str(WORK / "youtube"), "--specpath", str(WORK), "workers/youtube_catalog.py"])
     npx = "npx.cmd" if os.name == "nt" else "npx"
-    for source, target in [("scripts/riot-ingest.ts", "riot-sync.cjs"), ("scripts/sync_pro_players.ts", "pro-sync.cjs"), ("scripts/sync-data.ts", "data-sync.cjs")]:
+    run([npx, "tsx", "scripts/build-video-seed.ts", "--output", str(OUTPUT / "videos.seed.sqlite")])
+    for source, target in [("scripts/riot-ingest.ts", "riot-sync.cjs"), ("scripts/sync_pro_players.ts", "pro-sync.cjs"), ("scripts/sync-data.ts", "data-sync.cjs"), ("scripts/seed-video-catalog.ts", "seed-videos.cjs")]:
         run([npx, "esbuild", source, "--bundle", "--platform=node", "--format=cjs", "--target=node24", f"--outfile={OUTPUT / target}"])
 
 if __name__ == "__main__":

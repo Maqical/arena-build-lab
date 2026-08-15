@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { RunTracker } from "@/components/run-tracker";
 import { StatLab } from "@/components/stat-lab";
-import type { CatalogEntity, Champion, Combo, EntityOption, StatFormula, Video } from "@/lib/types";
+import type { CatalogEntity, Champion, Combo, EntityOption, StatFormula, Video, VideoStatClaim } from "@/lib/types";
 
 type Overview = {
   champions: number;
@@ -20,7 +20,7 @@ type Overview = {
   lastSync: string;
 };
 
-type View = "combos" | "augment" | "item" | "videos" | "statlab" | "runs";
+type View = "combos" | "augment" | "item" | "videos" | "vstats" | "statlab" | "runs";
 
 const GOALS = [
   ["", "Any ceiling"],
@@ -143,6 +143,29 @@ function VideoCard({ video }: { video: Video }) {
   );
 }
 
+function VideoStatCard({ claim }: { claim: VideoStatClaim }) {
+  const display = claim.unit === "%" || claim.value >= 10_000
+    ? claim.value.toLocaleString(undefined, { maximumFractionDigits: claim.value < 100 ? 1 : 0 })
+    : claim.value.toLocaleString(undefined, { maximumFractionDigits: 1 });
+  return (
+    <article className="video-stat-card">
+      <div className="video-stat-value">
+        <strong>{display}{claim.unit}</strong>
+        <span>{claim.statLabel}</span>
+      </div>
+      <div className="video-stat-body">
+        <span className="eyebrow">{claim.championKey || "Unknown champion"}{claim.confidence >= 0.9 ? " · high confidence" : " · reviewed"}</span>
+        <a href={claim.url} target="_blank" rel="noreferrer"><h3>{claim.title}</h3></a>
+        <p>“{claim.evidenceText}”</p>
+        <div className="tag-row">
+          <span>{claim.source}</span>
+          {claim.publishedAt && <span>{new Date(claim.publishedAt).toLocaleDateString()}</span>}
+        </div>
+      </div>
+    </article>
+  );
+}
+
 export function ArenaWorkbench({
   overview,
   champions,
@@ -165,6 +188,7 @@ export function ArenaWorkbench({
   const [entities, setEntities] = useState<CatalogEntity[]>([]);
   const [combos, setCombos] = useState<Combo[]>(initialCombos);
   const [videos, setVideos] = useState<Video[]>([]);
+  const [statClaims, setStatClaims] = useState<VideoStatClaim[]>([]);
   const [loading, setLoading] = useState(false);
 
   const selectedChampion = useMemo(
@@ -192,6 +216,11 @@ export function ArenaWorkbench({
           const response = await fetch(`/api/videos?${params}`, { signal: controller.signal });
           const payload = await response.json() as { videos: Video[] };
           setVideos(payload.videos);
+        } else if (view === "vstats") {
+          const params = new URLSearchParams({ q: query, champion, limit: "120" });
+          const response = await fetch(`/api/video-stats?${params}`, { signal: controller.signal });
+          const payload = await response.json() as { claims: VideoStatClaim[] };
+          setStatClaims(payload.claims);
         } else {
           const params = new URLSearchParams({ kind: view, q: query, tag: goal, limit: "72" });
           const response = await fetch(`/api/catalog?${params}`, { signal: controller.signal });
@@ -208,8 +237,8 @@ export function ArenaWorkbench({
     };
   }, [view, query, goal, champion, ownedEntityKey, showDiscovered]);
 
-  const explorerView = view === "combos" || view === "augment" || view === "item" || view === "videos";
-  const resultCount = view === "combos" ? combos.length : view === "videos" ? videos.length : entities.length;
+  const explorerView = view === "combos" || view === "augment" || view === "item" || view === "videos" || view === "vstats";
+  const resultCount = view === "combos" ? combos.length : view === "videos" ? videos.length : view === "vstats" ? statClaims.length : entities.length;
 
   return (
     <main className="build-lab-page">
@@ -222,6 +251,7 @@ export function ArenaWorkbench({
             ["statlab", "∑", "Stat Lab"],
             ["runs", "◎", "My runs"],
             ["videos", "▶", "Video evidence"],
+            ["vstats", "❚", "Video stats"],
           ] as const).map(([target, icon, label]) => (
             <button className={view === target ? "active" : ""} onClick={() => setView(target)} key={target}>
               <span>{icon}</span>{label}
@@ -298,9 +328,12 @@ export function ArenaWorkbench({
         <section className="results-heading">
           <div>
             <span className="eyebrow">{loading ? "Analyzing…" : `${resultCount} results shown`}</span>
-            <h2>{view === "combos" ? "Conversion paths" : view === "augment" ? "Augment database" : view === "item" ? "Arena item database" : "Video evidence catalog"}</h2>
+            <h2>{view === "combos" ? "Conversion paths" : view === "augment" ? "Augment database" : view === "item" ? "Arena item database" : view === "vstats" ? "Stats called out in video titles" : "Video evidence catalog"}</h2>
             {view === "combos" && selectedOwnedEntity && (
               <p className="anchor-note">Anchored to <strong>{selectedOwnedEntity.name}</strong> — every result contains what you already own.</p>
+            )}
+            {view === "vstats" && (
+              <p className="anchor-note">Lexical claims extracted straight from video titles — e.g. “707 Lethality Pyke”, “257% Shardblade”. Click a card to watch the source video.</p>
             )}
           </div>
           <div className="result-actions">
@@ -310,13 +343,13 @@ export function ArenaWorkbench({
                 <span /> Include unverified discoveries
               </label>
             )}
-            <a className="export-link" href={`/api/export?kind=${view === "augment" || view === "item" ? view : view === "videos" ? "videos" : "combos"}`}>
+            <a className="export-link" href={`/api/export?kind=${view === "augment" || view === "item" ? view : view === "videos" || view === "vstats" ? "videos" : "combos"}`}>
               Export full CSV ↓
             </a>
           </div>
         </section>
 
-        <section className={`result-grid ${view === "videos" ? "video-grid" : ""}`} aria-busy={loading}>
+        <section className={`result-grid ${view === "videos" ? "video-grid" : view === "vstats" ? "vstats-grid" : ""}`} aria-busy={loading}>
           {view === "combos" && combos.map((combo) => <ComboCard combo={combo} key={combo.slug} />)}
           {(view === "augment" || view === "item") && entities.map((entity) => (
             <EntityCard
@@ -331,6 +364,7 @@ export function ArenaWorkbench({
             />
           ))}
           {view === "videos" && videos.map((video) => <VideoCard video={video} key={video.videoId} />)}
+          {view === "vstats" && statClaims.map((claim) => <VideoStatCard claim={claim} key={`${claim.videoId}:${claim.statKey}:${claim.value}`} />)}
           {!loading && resultCount === 0 && (
             <div className="empty-state">
               <strong>No current-patch matches.</strong>

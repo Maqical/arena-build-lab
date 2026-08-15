@@ -6,7 +6,13 @@ import type { ResolverChampion, ResolverScenario } from "../src/engine/resolver"
 import { SCHEMA_SQL } from "../src/lib/schema";
 
 const SCENARIO_NAME = "high-stack-benchmark-v1";
-const TARGET_CHAMPIONS = ["Sion", "Chogath", "Swain", "Shyvana", "Senna", "Thresh"];
+const TARGET_CHAMPIONS = [
+  "Sion", "Chogath", "Swain", "Shyvana", "Senna", "Thresh",
+  "Nasus", "Veigar", "Smolder", "Kindred", "Belveth", "DrMundo",
+  "Trundle", "Volibear", "Taric", "Warwick",
+  "Mordekaiser", "Illaoi", "Gwen", "Briar", "Sett", "Darius", "Garen", "Urgot",
+  "Nilah", "Draven", "KogMaw", "Vayne", "Twitch", "Aphelios",
+];
 const scenarioInputs = {
   ...DEFAULT_EXTREME_SCENARIO,
   heartsteelStacks: 48_000,

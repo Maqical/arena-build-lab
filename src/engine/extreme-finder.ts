@@ -136,12 +136,34 @@ export function findExtremeBuilds(input: ExtremeFinderInput): ExtremeBuild[] {
         };
         const list = perObjective.get(objective) ?? [];
         list.push(build);
-        list.sort((left, right) => Number(right.theoreticalUnbounded) - Number(left.theoreticalUnbounded) || right.score - left.score);
-        if (list.length > keep) list.length = keep;
         perObjective.set(objective, list);
       }
     }
-    for (const builds of perObjective.values()) output.push(...builds);
+    for (const builds of perObjective.values()) {
+      const ranked = dedupeExtremeBuilds([...builds].sort((left, right) => Number(right.theoreticalUnbounded) - Number(left.theoreticalUnbounded) || right.score - left.score));
+      if (ranked.length > keep) ranked.length = keep;
+      output.push(...ranked);
+    }
   }
   return output.sort((left, right) => left.championName.localeCompare(right.championName) || left.objective.localeCompare(right.objective) || right.score - left.score);
+}
+
+/**
+ * The resolver explores every 1P/2G/1S combination, so the top-N list for an
+ * objective converges on one dominant build with a different irrelevant slot
+ * augment each time (e.g. Goliath + Tank Engine + Quest: Steel Your Heart with
+ * Eureka vs Tap Dancer in the prismatic slot — identical maxHealth). Collapse
+ * builds that land on the same objective score so the archive shows one
+ * representative per distinct result: keep the first (best-ranked) one.
+ */
+export function dedupeExtremeBuilds(builds: readonly ExtremeBuild[]): ExtremeBuild[] {
+  const seen = new Set<string>();
+  const output: ExtremeBuild[] = [];
+  for (const build of builds) {
+    const key = `${build.championKey}:${build.objective}:${build.score.toPrecision(10)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    output.push(build);
+  }
+  return output;
 }
